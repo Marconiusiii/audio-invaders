@@ -1,0 +1,261 @@
+:root {
+	--primary: #00ff00;
+	--danger: #ff0000;
+	--bg: #050505;
+	--ui-bg: #1a1a1a;
+}
+
+body {
+	font-family: 'Courier New', Courier, monospace;
+	background-color: var(--bg);
+	color: var(--primary); /* TEXT NOW GREEN */
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	height: 100vh;
+	margin: 0;
+	overflow: hidden;
+	user-select: none;
+}
+
+/* HUD */
+.hud {
+	display: flex;
+	justify-content: space-between;
+	width: 90%;
+	max-width: 600px;
+	margin-bottom: 1rem;
+	padding: 1rem;
+	background: var(--ui-bg);
+	border: 2px solid #333;
+	border-radius: 8px;
+	font-size: 1.2rem;
+	font-weight: bold;
+	color: var(--primary);
+}
+
+.stat-box {
+	text-align: center;
+}
+
+.stat-label {
+	display: block;
+	font-size: 0.8rem;
+	color: #6aff6a; /* Slightly dimmer green */
+	margin-bottom: 4px;
+}
+
+/* Game Area */
+#game-board {
+	position: relative;
+	width: 90%;
+	max-width: 600px;
+	height: 600px;
+	background: radial-gradient(circle at bottom, #111 0%, #000 100%);
+	border: 2px solid #333;
+	overflow: hidden;
+	margin-bottom: 1rem;
+}
+
+/* Aliens */
+.alien {
+	position: absolute;
+	width: 30px;
+	height: 30px;
+	background-color: var(--primary);
+	border-radius: 50%;
+	transform: translate(-50%, -50%);
+	box-shadow: 0 0 10px var(--primary);
+	transition: top 0.1s linear, left 0.1s linear;
+}
+
+.alien.danger {
+	background-color: var(--danger);
+	box-shadow: 0 0 15px var(--danger);
+}
+
+/* Cannon Button */
+#cannon-btn {
+	width: 120px;
+	height: 120px;
+	background: #333;
+	border: 4px solid var(--primary);
+	border-radius: 50%;
+	color: var(--primary);
+	font-size: 1.5rem;
+	font-weight: bold;
+	cursor: pointer;
+	transition: all 0.1s;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	box-shadow: 0 0 20px rgba(0,255,0,0.3);
+	text-transform: uppercase;
+	position: relative;
+	z-index: 10;
+}
+
+#cannon-btn:active {
+	transform: scale(0.95);
+	background: #444;
+	box-shadow: 0 0 30px rgba(0,255,0,0.6);
+}
+
+#cannon-btn.misfire {
+	border-color: var(--danger);
+	color: var(--danger);
+	box-shadow: 0 0 20px rgba(255,0,0,0.5);
+}
+
+/* Hit Zone */
+.hit-zone {
+	position: absolute;
+	bottom: 0;
+	left: 50%;
+	transform: translateX(-50%);
+	width: 120px;
+	height: 100%;
+	border-left: 1px dashed #333;
+	border-right: 1px dashed #333;
+	pointer-events: none;
+	background: linear-gradient(to bottom, transparent 80%, rgba(0,255,0,0.1) 100%);
+}
+
+/* Screen Reader Only */
+.screen-reader-only {
+	position: absolute;
+	width: 1px;
+	height: 1px;
+	padding: 0;
+	overflow: hidden;
+	clip: rect(0, 0, 0, 0);
+	white-space: nowrap;
+	border: 0;
+}
+
+/* Overlay */
+#start-overlay {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	background: rgba(0,0,0,0.85);
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	z-index: 100;
+	text-align: center;
+	padding: 1rem;
+	color: var(--primary);
+}
+
+/* Glow for H1 */
+#start-overlay h1,
+h1 {
+	color: var(--primary);
+	text-shadow:
+		0 0 4px #00ff00,
+		0 0 12px #00cc00,
+		0 0 20px #009900;
+}
+
+/* Primary Buttons */
+.btn-primary {
+	background: var(--primary);
+	color: black;
+	border: none;
+	padding: 1rem 2rem;
+	font-size: 1.5rem;
+	font-weight: bold;
+	cursor: pointer;
+	margin-top: 2rem;
+	border-radius: 4px;
+}
+
+/* Laser Beam */
+.laser-beam {
+	position: absolute;
+	left: 50%;
+	bottom: 0;
+	transform: translateX(-50%);
+	width: 4px;
+	background: #00ff00;
+	box-shadow: 0 0 8px #00ff00;
+	animation: laserFade 0.15s linear forwards;
+	pointer-events: none;
+	z-index: 20; /* ensure it sits above aliens */
+}
+
+/* Correct Explosion Effect */
+.alien-explode {
+	position: absolute;
+	width: 40px;
+	height: 40px;
+	border-radius: 50%;
+	background: radial-gradient(circle, #ffeb3b, #ff5722, #d84315);
+	box-shadow: 0 0 20px 10px rgba(255, 87, 34, 0.7);
+	transform: translate(-50%, -50%);
+	animation: explodeAnim 0.5s ease-out forwards;
+	pointer-events: none;
+	z-index: 30; /* above aliens and beam */
+}
+
+
+/* Footer Panel */
+#footer {
+	width: 100%;
+	background: var(--ui-bg);
+	border-top: 2px solid #333;
+	color: var(--primary);
+	padding: 1rem 0.5rem;
+	text-align: center;
+	margin-top: 1rem;
+	font-size: 1rem;
+}
+
+/* Footer Navigation */
+#footer nav {
+	margin-bottom: 0.5rem;
+}
+
+/* Footer link list – remove bullets and spacing */
+#footer ul.footer-links {
+	list-style-type: none;  /* Remove bullets explicitly */
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: row;
+	justify-content: center;
+	gap: 2rem;
+}
+
+/* Footer Links */
+#footer ul.footer-links li {
+	margin: 0;
+	padding: 0;
+}
+
+#footer ul.footer-links a {
+	color: var(--primary);
+	text-decoration: none;
+	font-weight: bold;
+	text-shadow:
+		0 0 4px #00ff00,
+		0 0 10px #009900;
+}
+
+#footer ul.footer-links a:hover,
+#footer ul.footer-links a:focus {
+	text-decoration: underline;
+}
+
+/* Footer small print */
+.footer-copy {
+	color: var(--primary);
+	opacity: 0.8;
+	margin-top: 0.5rem;
+	font-size: 0.875rem;
+}

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Audio Invaders</title>
+	<meta name="description" content="An accessible audio-based Space Invaders game created by Chancey Fleet. Edited by Marco Salsiccia.">
+
+	<link rel="stylesheet" type="text/css" href="css/aliens.css">
+
+</head>
+<body>
+<main>
+<div class="hud" id="hud" inert>
+	<div class="stat-box">
+		<div role="text">
+			<span class="stat-label">ENERGY</span>
+			<span id="energy-display">100</span>
+		</div>
+	</div>
+	<div class="stat-box">
+		<div role="text">
+			<span class="stat-label">SCORE</span>
+			<span id="score-display">0</span>
+		</div>
+	</div>
+	<div class="stat-box">
+		<div role="text">
+			<span class="stat-label">ROUND</span>
+			<span id="round-display">1</span>
+		</div>
+	</div>
+</div>
+	<div id="high-scores"
+		class="hud">
+		<h2 id="high-scores-heading">High Scores</h2>
+		<ol id="highscore-list">
+		</ol>
+	</div>
+
+	<div id="game-board" aria-hidden="true">
+		<!-- Visual guides -->
+		<div class="hit-zone"></div>
+		<!-- Aliens injected here -->
+	</div>
+
+	<button inert id="cannon-btn" aria-label="Fire Cannon.">
+        FIRE
+	</button>
+
+	<!-- Start Overlay -->
+	<div id="start-overlay">
+		<h1 id="hTitle">AUDIO INVADERS</h1>
+		<p>Created by Chancey Fleet, Edited by Marco Salsiccia. Updated Dec 4, 2025</p>
+		<details>
+			<summary>Dec 10 Update Log</summary>
+			<ul>
+			<li>Prepped files for going open-source up on Github.</li>
+			<li>Added footer and version information.</li>
+			<li>Ensured that the footer and high scores area become inert during gameplay.</li>
+			<li>Concatenated the HUD elements so they are grouped for screen reader users.</li>
+			</ul>
+	</details>
+	<h2>How to Play</h2>
+		<ol>
+			<li> Wear Headphones.</li>
+			<li>Listen for beeps moving Left to Right.</li>
+			<li>Click FIRE when the sound is in the CENTER.</li>
+			<li>Faster beeps = Aliens closer to bottom!</li>
+			<li>Fire the cannon with Space Bar or Enter Key.</li>
+			<li>After Round 5, hitting 3 aliens in a row will give you an energy boost.</li>
+		</ol>
+
+		<form aria-label="New High Score" id="highscore-form" hidden>
+<h3>New High Score!</h3>
+			<p id="hs-message">
+				Well done! Enter your initials to save your score.
+			</p>
+			<label for="hs-initials">Enter Your Initials:</label>
+			<input
+				id="hs-initials"
+				name="initials"
+				type="text"
+				inputmode="text"
+				pattern="[A-Za-z]{1,3}"
+				minlength="1"
+				maxlength="3"
+				required
+			>
+			<p id="hs-error" class="screen-reader-only" aria-live="polite"></p>
+			<div>
+				<button type="submit" class="btn-primary">Save Score</button>
+				<button type="button" id="hs-cancel-btn">Don't Save</button>
+			</div>
+		</form>
+
+	<button id="start-btn" class="btn-primary">START GAME</button>
+	</div>
+
+	<!-- Accessibility Live Region -->
+	<div id="aria-announcer" class="screen-reader-only" aria-live="assertive"></div>
+
+</main>
+<footer id="footer" class="footer-panel">
+	<nav aria-label="Footer">
+		<ul class="footer-links">
+			<li><a href="https://marconius.com/">marconius.com</a></li>
+			<li><a href="https://marconius.com/fun/audioArcher/">Arcane Audio Archer</a></li>
+			<li><a href="https://github.com/Marconiusiii/audio-invaders/">Audio Invaders on GitHub</a></li>
+		</ul>
+	</nav>
+
+	<p class="footer-copy small muted">
+		&copy;2025 Chancey Fleet and Marco Salsiccia - v.1.0.0</p>
+</footer>
+
+<script src="scripts/audioInvaders.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,29 @@
+# macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Recursively ignore any DS_Store files anywhere
+**/.DS_Store
+
+# Files that macOS Finder creates on network drives
+._*
+
+# Icon files from custom folder icons
+Icon?
+
+# Thumbnails
+.DS_Store?
+.TemporaryItems
+.Trashes
+
+# Node/Web build artifacts (safe even if unused)
+node_modules/
+dist/
+build/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
