@@ -308,12 +308,14 @@ class AudioEngine {
 */
 const audio = new AudioEngine();
 const gameBoard = document.getElementById('game-board');
+const hud = document.getElementById('hud');
 const scoreDisplay = document.getElementById('score-display');
 const energyDisplay = document.getElementById('energy-display');
 const roundDisplay = document.getElementById('round-display');
 const ariaAnnouncer = document.getElementById('aria-announcer');
 const cannonBtn = document.getElementById('cannon-btn');
 const startOverlay = document.getElementById('start-overlay');
+const hsDiv = document.getElementById('high-scores');
 const footer = document.getElementById('footer');
 
 let state = {
@@ -338,10 +340,37 @@ function announce(text) {
 	ariaAnnouncer.textContent = text;
 }
 
+function setHudValue(el, value) {
+	const nextValue = String(value);
+
+	if (el.textContent === nextValue) {
+		return;
+	}
+
+	el.replaceChildren(document.createTextNode(nextValue));
+
+	// Non-ARIA nudge for some AT/browser combos.
+	// (Safe, doesn’t change semantics.)
+	el.dataset.value = nextValue;
+}
+
+function setHudValue(el, value) {
+	const nextValue = String(value);
+
+	el.replaceChildren(document.createTextNode(nextValue));
+	el.dataset.value = nextValue;
+}
+
 function updateStats() {
-	scoreDisplay.textContent = state.score;
-	energyDisplay.textContent = state.energy;
-	roundDisplay.textContent = state.round;
+	setHudValue(scoreDisplay, state.score);
+	setHudValue(energyDisplay, state.energy);
+	setHudValue(roundDisplay, state.round);
+
+	// Safari + VoiceOver: nudge the accessibility tree to pick up changes.
+	// This does not add ARIA or make anything focusable.
+	if (hud && !hud.hasAttribute('hidden')) {
+		hud.dataset.tick = String(performance.now());
+	}
 }
 
 function spawnAlien() {
@@ -398,10 +427,10 @@ function gameOver() {
 	announce(`Game over, man, game over! Final Score ${state.score}.`);
 
 	setTimeout(() => {
-		const hud = document.getElementById('hud');
 		const cannon = document.getElementById('cannon-btn');
 		if (hud) {
 			hud.setAttribute('inert', '');
+			hud.setAttribute('hidden', '');
 		}
 		if (cannon) {
 			cannon.setAttribute('inert', '');
@@ -420,7 +449,6 @@ function gameOver() {
 	startBtnFocusTimeoutId = setTimeout(() => {
 		document.getElementById('start-btn').focus();
 	}, 5000);
-
 
 }
 
@@ -588,21 +616,30 @@ state.aliens.splice(hitIndex, 1);
 target.el.remove();
 
 state.score += 100;
-		if (state.round <= 5) {
-			state.energy = Math.min(100, state.energy + 10);
-		} else {
-			state.energy = Math.min(160, state.energy+10);
-		};
-		if (streak === 3) {
-			state.energy += 15;
-			audio.playPowerUp();
-			streak = 0;
+
+if (state.round <= 5) {
+	state.energy = Math.min(100, state.energy + 10);
+	audio.playHit();
+	announce(`Hit! ${state.score}`);
+} else {
+	state.energy = Math.min(175, state.energy + 10);
+
+	if (streak === 3) {
+		if (state.energy <= 160) {
+			state.energy = Math.min(175, state.energy + 15);
 			announce('+15 Energy Bonus!');
 		} else {
-			audio.playHit();
-			announce(`Hit! ${state.score}`);
-		};
+			state.energy = 175;
+			announce('Max Energy!');
+		}
 
+		audio.playPowerUp();
+		streak = 0;
+	} else {
+		audio.playHit();
+		announce(`Hit! ${state.score}`);
+	}
+}
 
 	} else {
 		// Miss
@@ -625,9 +662,12 @@ state.score += 100;
 
 document.getElementById('start-btn').addEventListener('click', () => {
 	audio.init();
-	document.getElementById('hud').removeAttribute('inert');
 	document.getElementById('cannon-btn').removeAttribute('inert');
 	document.getElementById('cannon-btn').focus();
+	if (hud) {
+		hud.removeAttribute('hidden');
+		hud.removeAttribute('inert');
+	}
 	if (hsDiv) {
 		hsDiv.setAttribute('inert', '');
 	}
@@ -635,7 +675,6 @@ document.getElementById('start-btn').addEventListener('click', () => {
 		footer.setAttribute('inert', '');
 	}
 
-	
 	// Reset Game State
 	state.score = 0;
 	state.energy = 100;
@@ -650,12 +689,14 @@ document.getElementById('start-btn').addEventListener('click', () => {
 
 	startOverlay.style.display = 'none';
 	announce("Game Started. Listen for the beeps.");
-	updateStats();
-	
+
+	requestAnimationFrame(() => {
+		updateStats();
+	});
 	requestAnimationFrame(gameLoop);
 });
 
-cannonBtn.addEventListener('mousedown', fireCannon);
+cannonBtn.addEventListener('pointerup', fireCannon);
 
 // Keyboard support (Space or Enter to fire)
 window.addEventListener('keydown', (e) => {
@@ -682,7 +723,7 @@ const HS_TOKEN = "h4ckingIsBadMkay?!";
 
 // Path to PHP script
 const HIGH_SCORES_URL = CURRENT_API_URL;
-const hsDiv = document.getElementById('high-scores');
+
 
 const MAX_HIGH_SCORES = 10;
 
@@ -901,18 +942,17 @@ if (hsCancelBtn) {
 
 // Wrap the original gameOver to add high score handling
 if (typeof gameOver === 'function') {
-    const _originalGameOver = gameOver;
-    gameOver = function () {
-        _originalGameOver();
-
-        loadHighScoresFromServer().then((scores) => {
-            if (qualifiesForHighScore(state.score, scores)) {
-                if (startBtnFocusTimeoutId !== null) {
-                    clearTimeout(startBtnFocusTimeoutId);
-                    startBtnFocusTimeoutId = null;
-                }
-                enterHighScorePrompt(state.score);
-            }
-        });
-    };
+	const _originalGameOver = gameOver;
+	gameOver = function () {
+		_originalGameOver();
+		loadHighScoresFromServer().then((scores) => {
+			if (qualifiesForHighScore(state.score, scores)) {
+				if (startBtnFocusTimeoutId !== null) {
+					clearTimeout(startBtnFocusTimeoutId);
+					startBtnFocusTimeoutId = null;
+				}
+				enterHighScorePrompt(state.score);
+			}
+		});
+	};
 }
