@@ -2,7 +2,7 @@
 
 Audio Invaders is an accessible, audio-driven browser game inspired by the original Space Invaders arcade game. Created by Chancey Fleet with additional engineering and accessibility improvements by Marco Salsiccia.
 
-The game is played primarily through stereo audio, with subtle visual effects and cues for sighted players. The game itself is fully keybaord and screen reader accessible, playable on mobile, and follows WCAG 2.2 AA standards.
+The game is played primarily through stereo audio, with subtle visual effects and cues for sighted players. The game itself is fully keyboard and screen reader accessible, playable on mobile, and follows WCAG 2.2 AA standards.
 
 This repository does not include the server-side PHP or JSON files needed for high score storage.
 
@@ -17,19 +17,23 @@ This repository does not include the server-side PHP or JSON files needed for hi
 - Sound effects include explosions, shots, hits, misses, and power-ups
 
 ### Accessibility
+
 - WCAG 2.2 AA compliant interface
 - Live region announcements for game events
 - All controls are keyboard accessible
 - Non-game UI becomes inert during gameplay to reduce navigation noise
 
 ### Visual Enhancements
+
 - High contrast neon green retro theme
 - Animated laser beam from the cannon
 - Animated alien explosions
 - Responsive HUD and scoreboard
 
 ### High Score System
+
 The high score system communicates with a secure PHP endpoint and JSON data file, which are not included in this repository. The JavaScript includes:
+
 - GET and POST communication
 - Secret token required for writes
 - Score sorting and rendering
@@ -39,7 +43,7 @@ You may implement your own server components.
 ## Setup and Usage
 
 1. Clone the repository  
-   git clone https://github.com/your-username/audio-invaders.git
+   git clone https://github.com/marconiusiii/audio-invaders.git
 
 2. Open index.html in a modern browser.
 
