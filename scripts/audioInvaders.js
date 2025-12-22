@@ -786,17 +786,54 @@ document.getElementById('start-btn').addEventListener('click', () => {
 
 cannonBtn.addEventListener('pointerup', fireCannon);
 
-// Keyboard support (Space or Enter to fire)
+//Keyboard Shortcuts
 window.addEventListener('keydown', (e) => {
+	// Don’t steal keys when the user is typing in a form field (high score initials, etc.)
+	const activeEl = document.activeElement;
+	const activeTag = activeEl ? activeEl.tagName.toLowerCase() : '';
+	const isTypingField = activeTag === 'input' || activeTag === 'textarea' || activeEl?.isContentEditable;
+
+	if (isTypingField) {
+		return;
+	}
+
+	// Stat hotkeys (only during active gameplay)
+	if (state.isActive) {
+		const key = (e.key || '').toLowerCase();
+
+		if (key === 's') {
+			e.preventDefault();
+			announce(`Score: ${state.score}`);
+			return;
+		}
+
+		if (key === 'e') {
+			e.preventDefault();
+			announce(`Energy: ${state.energy}`);
+			return;
+		}
+
+		if (key === 'r') {
+			e.preventDefault();
+			announce(`Round ${state.round}`);
+			return;
+		}
+	}
+
+	// Fire controls
 	if (e.code === 'Space' || e.code === 'Enter') {
 		if (state.isActive) {
+			e.preventDefault();
+
 			fireCannon();
+
 			// Visual press effect
 			cannonBtn.style.transform = "scale(0.95)";
 			setTimeout(() => cannonBtn.style.transform = "scale(1)", 100);
 		}
 	}
 });
+
 // --- Shared High Score Logic (server-based) ---
 //
 // These expect matching elements in the HTML:
