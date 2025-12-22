@@ -321,7 +321,7 @@ function initEnergyAlertAudio() {
 	alertOsc = audio.ctx.createOscillator();
 	alertGain = audio.ctx.createGain();
 
-	alertOsc.type = 'sawtooth';
+	alertOsc.type = 'square';
 	alertGain.gain.value = 0;
 
 	alertOsc.connect(alertGain);
@@ -351,7 +351,8 @@ function startWarningTone() {
 
 	energyAlertState = 'warning';
 
-	const baseFreq = 420;
+	const baseFreq = 120;
+	alertOsc.detune.setValueAtTime(-12, audio.ctx.currentTime);
 	const onTime = 0.6;
 	const offTime = 1.5;
 
