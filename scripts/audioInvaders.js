@@ -308,11 +308,13 @@ class AudioEngine {
 */
 const audio = new AudioEngine();
 const gameBoard = document.getElementById('game-board');
-const hud = document.getElementById('hud');
-const scoreDisplay = document.getElementById('score-display');
-const energyDisplay = document.getElementById('energy-display');
-const roundDisplay = document.getElementById('round-display');
+let hud = null;
+let scoreDisplay = null;
+let energyDisplay = null;
+let roundDisplay = null;
+
 const ariaAnnouncer = document.getElementById('aria-announcer');
+
 const cannonBtn = document.getElementById('cannon-btn');
 const startOverlay = document.getElementById('start-overlay');
 const hsDiv = document.getElementById('high-scores');
@@ -336,40 +338,134 @@ const HIT_THRESHOLD = HIT_ZONE_WIDTH / 2;
 // Calculate hit zone boundaries relative to center
 const CENTER_X = GAME_WIDTH / 2;
 
+function createHud() {
+	if (hud) return;
+
+	hud = document.createElement('div');
+	hud.id = 'hud';
+	hud.className = 'hud';
+
+	const energyBox = document.createElement('div');
+	energyBox.className = 'stat-box';
+
+	const energyText = document.createElement('div');
+	energyText.setAttribute('role', 'text');
+
+	const energyLabel = document.createElement('span');
+	energyLabel.className = 'stat-label';
+	energyLabel.textContent = 'ENERGY';
+
+	energyDisplay = document.createElement('span');
+	energyDisplay.id = 'energy-display';
+	energyDisplay.textContent = state.energy;
+
+	energyText.appendChild(energyLabel);
+	energyText.appendChild(energyDisplay);
+	energyBox.appendChild(energyText);
+
+	const scoreBox = document.createElement('div');
+	scoreBox.className = 'stat-box';
+
+	const scoreText = document.createElement('div');
+	scoreText.setAttribute('role', 'text');
+
+	const scoreLabel = document.createElement('span');
+	scoreLabel.className = 'stat-label';
+	scoreLabel.textContent = 'SCORE';
+
+	scoreDisplay = document.createElement('span');
+	scoreDisplay.id = 'score-display';
+	scoreDisplay.textContent = state.score;
+
+	scoreText.appendChild(scoreLabel);
+	scoreText.appendChild(scoreDisplay);
+	scoreBox.appendChild(scoreText);
+
+	const roundBox = document.createElement('div');
+	roundBox.className = 'stat-box';
+
+	const roundText = document.createElement('div');
+	roundText.setAttribute('role', 'text');
+
+	const roundLabel = document.createElement('span');
+	roundLabel.className = 'stat-label';
+	roundLabel.textContent = 'ROUND';
+
+	roundDisplay = document.createElement('span');
+	roundDisplay.id = 'round-display';
+	roundDisplay.textContent = state.round;
+
+	roundText.appendChild(roundLabel);
+	roundText.appendChild(roundDisplay);
+	roundBox.appendChild(roundText);
+
+	hud.appendChild(energyBox);
+	hud.appendChild(scoreBox);
+	hud.appendChild(roundBox);
+
+	// Insert HUD before game board
+	gameBoard.parentNode.insertBefore(hud, gameBoard);
+}
+
+function destroyHud() {
+	if (!hud) return;
+
+	hud.remove();
+	hud = null;
+	scoreDisplay = null;
+	energyDisplay = null;
+	roundDisplay = null;
+}
+
 function announce(text) {
 	ariaAnnouncer.textContent = text;
 }
 
-function setHudValue(el, value) {
+function replaceHudValue(el, value) {
+	if (!el) return;
+
 	const nextValue = String(value);
 
-	if (el.textContent === nextValue) {
-		return;
+	// If value didn't change, do nothing (keeps DOM calmer).
+	if (el.textContent === nextValue) return;
+
+	// Replace the entire node to force macOS Safari + VoiceOver to refresh AX.
+	const replacement = el.cloneNode(false);
+	replacement.textContent = nextValue;
+
+	// Preserve id (cloneNode(false) keeps attributes, but be explicit).
+	replacement.id = el.id;
+
+	el.replaceWith(replacement);
+
+	// Update our references so future updates hit the current node.
+	if (replacement.id === 'score-display') {
+		scoreDisplay = replacement;
+	} else if (replacement.id === 'energy-display') {
+		energyDisplay = replacement;
+	} else if (replacement.id === 'round-display') {
+		roundDisplay = replacement;
 	}
-
-	el.replaceChildren(document.createTextNode(nextValue));
-
-	// Non-ARIA nudge for some AT/browser combos.
-	// (Safe, doesn’t change semantics.)
-	el.dataset.value = nextValue;
 }
 
-function setHudValue(el, value) {
-	const nextValue = String(value);
+let lastHudAnnounceTime = 0;
 
-	el.replaceChildren(document.createTextNode(nextValue));
-	el.dataset.value = nextValue;
+function isMacOSSafari() {
+	const ua = navigator.userAgent;
+	const isSafari = ua.includes('Safari') && !ua.includes('Chrome') && !ua.includes('Chromium');
+	const isMac = ua.includes('Macintosh');
+	return isSafari && isMac;
 }
 
 function updateStats() {
-	setHudValue(scoreDisplay, state.score);
-	setHudValue(energyDisplay, state.energy);
-	setHudValue(roundDisplay, state.round);
-
-	// Safari + VoiceOver: nudge the accessibility tree to pick up changes.
-	// This does not add ARIA or make anything focusable.
-	if (hud && !hud.hasAttribute('hidden')) {
-		hud.dataset.tick = String(performance.now());
+	if (scoreDisplay) {
+		scoreDisplay.textContent = state.score;
+	}
+	if (energyDisplay) {
+		energyDisplay.textContent = state.energy;
+	}
+	if (roundDisplay) {
+		roundDisplay.textContent = state.round;
 	}
 }
 
@@ -428,10 +524,6 @@ function gameOver() {
 
 	setTimeout(() => {
 		const cannon = document.getElementById('cannon-btn');
-		if (hud) {
-			hud.setAttribute('inert', '');
-			hud.setAttribute('hidden', '');
-		}
 		if (cannon) {
 			cannon.setAttribute('inert', '');
 		}
@@ -441,6 +533,7 @@ function gameOver() {
 		if (footer) {
 			footer.removeAttribute('inert');
 		}
+	destroyHud();
 
 		startOverlay.style.display = 'flex';
 		startOverlay.querySelector('h1').textContent = "Game Over, man, game over!";
@@ -664,10 +757,6 @@ document.getElementById('start-btn').addEventListener('click', () => {
 	audio.init();
 	document.getElementById('cannon-btn').removeAttribute('inert');
 	document.getElementById('cannon-btn').focus();
-	if (hud) {
-		hud.removeAttribute('hidden');
-		hud.removeAttribute('inert');
-	}
 	if (hsDiv) {
 		hsDiv.setAttribute('inert', '');
 	}
@@ -687,12 +776,11 @@ document.getElementById('start-btn').addEventListener('click', () => {
 	state.aliens.forEach(a => a.el.remove());
 	state.aliens = [];
 
+
 	startOverlay.style.display = 'none';
 	announce("Game Started. Listen for the beeps.");
-
-	requestAnimationFrame(() => {
-		updateStats();
-	});
+	createHud();
+	updateStats();
 	requestAnimationFrame(gameLoop);
 });
 
