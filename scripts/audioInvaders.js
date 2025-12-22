@@ -307,11 +307,118 @@ class AudioEngine {
 /* * GAME LOGIC 
 */
 const audio = new AudioEngine();
+
+// --- ENERGY ALERT AUDIO (WARNING / DANGER) ---
+
+let alertOsc = null;
+let alertGain = null;
+let alertInterval = null;
+let energyAlertState = 'none'; // 'none' | 'warning' | 'danger'
+
+function initEnergyAlertAudio() {
+	if (!audio.ctx) return;
+
+	alertOsc = audio.ctx.createOscillator();
+	alertGain = audio.ctx.createGain();
+
+	alertOsc.type = 'sawtooth';
+	alertGain.gain.value = 0;
+
+	alertOsc.connect(alertGain);
+	alertGain.connect(audio.masterGain);
+
+	alertOsc.start();
+}
+
+function stopEnergyAlert() {
+	if (alertInterval) {
+		clearInterval(alertInterval);
+		alertInterval = null;
+	}
+
+	if (alertGain && audio.ctx) {
+		const now = audio.ctx.currentTime;
+		alertGain.gain.cancelScheduledValues(now);
+		alertGain.gain.linearRampToValueAtTime(0, now + 0.2);
+	}
+
+	energyAlertState = 'none';
+}
+
+function startWarningTone() {
+	if (energyAlertState === 'warning') return;
+	stopEnergyAlert();
+
+	energyAlertState = 'warning';
+
+	const baseFreq = 420;
+	const onTime = 0.6;
+	const offTime = 1.5;
+
+	alertOsc.frequency.setValueAtTime(baseFreq, audio.ctx.currentTime);
+
+	alertInterval = setInterval(() => {
+		const now = audio.ctx.currentTime;
+
+		alertGain.gain.cancelScheduledValues(now);
+		alertGain.gain.setValueAtTime(0, now);
+		alertGain.gain.linearRampToValueAtTime(0.06, now + 0.02);
+		alertGain.gain.setValueAtTime(0.06, now + onTime);
+		alertGain.gain.linearRampToValueAtTime(0, now + onTime + 0.15);
+	}, (onTime + offTime) * 1000);
+}
+
+function startDangerTone() {
+	if (energyAlertState === 'danger') return;
+	stopEnergyAlert();
+
+	energyAlertState = 'danger';
+
+	const lowFreq = 520;
+	const highFreq = 760;
+	const riseTime = 0.7;
+	const pauseTime = 0.6;
+
+	alertInterval = setInterval(() => {
+		const now = audio.ctx.currentTime;
+
+		alertOsc.frequency.cancelScheduledValues(now);
+		alertGain.gain.cancelScheduledValues(now);
+
+		alertOsc.frequency.setValueAtTime(lowFreq, now);
+		alertOsc.frequency.linearRampToValueAtTime(highFreq, now + riseTime);
+
+		alertGain.gain.setValueAtTime(0, now);
+		alertGain.gain.linearRampToValueAtTime(0.07, now + 0.05);
+		alertGain.gain.setValueAtTime(0.07, now + riseTime - 0.1);
+		alertGain.gain.linearRampToValueAtTime(0, now + riseTime);
+	}, (riseTime + pauseTime) * 1000);
+}
+
+function updateEnergyAlert() {
+	if (!state.isActive) return;
+
+	if (state.energy <= 20) {
+		startDangerTone();
+		return;
+	}
+
+	if (state.energy <= 60) {
+		startWarningTone();
+		return;
+	}
+
+	if (energyAlertState !== 'none') {
+		stopEnergyAlert();
+	}
+}
+
 const gameBoard = document.getElementById('game-board');
 let hud = null;
 let scoreDisplay = null;
 let energyDisplay = null;
 let roundDisplay = null;
+
 
 const ariaAnnouncer = document.getElementById('aria-announcer');
 
@@ -452,7 +559,7 @@ function replaceHudValue(el, value) {
 	// If value didn't change, do nothing (keeps DOM calmer).
 	if (el.textContent === nextValue) return;
 
-	// Replace the entire node to force macOS Safari + VoiceOver to refresh AX.
+
 	const replacement = el.cloneNode(false);
 	replacement.textContent = nextValue;
 
@@ -542,6 +649,7 @@ function spawnAlien() {
 
 function gameOver() {
 	state.isActive = false;
+	stopEnergyAlert();
 	audio.playBell(); // Ring bell at zero/end
 	announce(`Game over, man, game over! Final Score ${state.score}.`);
 
@@ -637,6 +745,8 @@ function gameLoop(timestamp) {
 			audio.playAlienExplosion();
 			announce("Kaboom! Energy lost.");
 			updateStats();
+			updateEnergyAlert();
+
 			
 			if (state.energy <= 0) gameOver();
 		}
@@ -649,6 +759,8 @@ function gameLoop(timestamp) {
 		state.round = expectedRound;
 		announce(`Round ${state.round}`);
 		updateStats();
+		updateEnergyAlert();
+
 	}
 
 
@@ -772,12 +884,16 @@ if (state.round <= 5) {
 	}
 
 	updateStats();
+	updateEnergyAlert();
+
 }
 
 // --- EVENT LISTENERS ---
 
 document.getElementById('start-btn').addEventListener('click', () => {
 	audio.init();
+	initEnergyAlertAudio();
+
 	document.getElementById('cannon-btn').removeAttribute('inert');
 	document.getElementById('cannon-btn').focus();
 	if (hsDiv) {
@@ -804,6 +920,8 @@ document.getElementById('start-btn').addEventListener('click', () => {
 	announce("Game Started. Listen for the beeps.");
 	createHud();
 	updateStats();
+	updateEnergyAlert();
+
 	requestAnimationFrame(gameLoop);
 });
 
