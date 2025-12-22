@@ -33,12 +33,13 @@
 		<h1 id="hTitle">AUDIO INVADERS</h1>
 		<p>Created by Chancey Fleet, Edited by Marco Salsiccia. Updated Dec 21, 2025</p>
 		<details>
-			<summary>Dec 10 Update Log</summary>
+			<summary>Dec 21 Update Log</summary>
 			<ul>
-			<li>Prepped files for going open-source up on Github.</li>
-			<li>Added footer and version information.</li>
-			<li>Ensured that the footer and high scores area become inert during gameplay.</li>
-			<li>Concatenated the HUD elements so they are grouped for screen reader users.</li>
+				<li>Added new keyboard shortcuts to quickly hear Energy, Score, and Round values. "E," "s," and "r" respectively.</li>
+				<li>Capped max energy at 175. If you get an energy bonus that would take you over 175, you'll hear "Max Energy!" and your energy wil be refilled to 175.</li>
+				<li>Reconstructed the HUD to build on game start and destroy itself when the game ends. Better than messing about with hidden and inert attributes.</li>
+				<li><strong>MacOS Safari Note: </strong>Due to a current webkit accessibility bug, VoiceOver will not read updated Energy, Score, or ROund values if you focus on the Hud during gameplay. The shortcuts will speak the correct values. This bug does not exist in iOS Safari.</li>
+				<li>Version number update and new git release.</li>
 			</ul>
 	</details>
 	<h2>How to Play</h2>
@@ -47,8 +48,8 @@
 			<li>Listen for beeps moving Left to Right.</li>
 			<li>Click FIRE when the sound is in the CENTER.</li>
 			<li>Faster beeps = Aliens closer to bottom!</li>
-			<li>Fire the cannon with Space Bar or Enter Key.</li>
-			<li>After Round 5, hitting 3 aliens in a row will give you an energy boost.</li>
+			<li>Keyboard Support: Fire the cannon with Space Bar or Enter Key. Press "e" to hear current Energy, "s" to hear current score, and "r" to hear current round when using a screen reader.</li>
+			<li>After Round 5, hitting 3 aliens in a row will give you a +15 energy boost. After round 5, max energy tops out at 175.</li>
 		</ol>
 
 		<form aria-label="New High Score" id="highscore-form" hidden>
@@ -90,7 +91,7 @@
 	</nav>
 
 	<p class="footer-copy small muted">
-		&copy;2025 Chancey Fleet and Marco Salsiccia - v.1.0.1</p>
+		&copy;2025 Chancey Fleet and Marco Salsiccia - v.1.1.0</p>
 </footer>
 
 <script src="scripts/audioInvaders.js"></script>
