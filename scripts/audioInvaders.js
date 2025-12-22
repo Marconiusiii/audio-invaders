@@ -1081,3 +1081,12 @@ if (typeof gameOver === 'function') {
 		});
 	};
 }
+
+function footerYear() {
+	const yearEl = document.getElementById('copyrightYear');
+	if (yearEl) {
+		yearEl.textContent = new Date().getFullYear();
+	}
+}
+
+footerYear();
