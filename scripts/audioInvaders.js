@@ -315,6 +315,29 @@ let roundDisplay = null;
 
 const ariaAnnouncer = document.getElementById('aria-announcer');
 
+
+
+let lastFireTimeMs = 0;
+
+function attemptFire(source) {
+	if (!state.isActive) return;
+
+	const nowMs = performance.now();
+
+	// De-dupe: prevents double-fire when AT triggers click plus a key event
+	if (nowMs - lastFireTimeMs < 80) return;
+
+	lastFireTimeMs = nowMs;
+
+	fireCannon();
+
+	// Visual press effect (safe everywhere)
+	cannonBtn.style.transform = "scale(0.95)";
+	setTimeout(() => {
+		cannonBtn.style.transform = "scale(1)";
+	}, 100);
+}
+
 const cannonBtn = document.getElementById('cannon-btn');
 const startOverlay = document.getElementById('start-overlay');
 const hsDiv = document.getElementById('high-scores');
@@ -784,7 +807,19 @@ document.getElementById('start-btn').addEventListener('click', () => {
 	requestAnimationFrame(gameLoop);
 });
 
-cannonBtn.addEventListener('pointerup', fireCannon);
+cannonBtn.addEventListener('click', (e) => {
+	e.preventDefault();
+	attemptFire('click');
+});
+
+cannonBtn.addEventListener('pointerdown', () => {
+	cannonBtn.style.transform = "scale(0.95)";
+});
+
+cannonBtn.addEventListener('pointercancel', () => {
+	cannonBtn.style.transform = "scale(1)";
+});
+
 
 //Keyboard Shortcuts
 window.addEventListener('keydown', (e) => {
@@ -820,18 +855,23 @@ window.addEventListener('keydown', (e) => {
 		}
 	}
 
-	// Fire controls
-	if (e.code === 'Space' || e.code === 'Enter') {
-		if (state.isActive) {
-			e.preventDefault();
+// Fire controls (keyboard only)
+if (e.code === 'Space' || e.code === 'Enter') {
+	if (!state.isActive) return;
 
-			fireCannon();
-
-			// Visual press effect
-			cannonBtn.style.transform = "scale(0.95)";
-			setTimeout(() => cannonBtn.style.transform = "scale(1)", 100);
-		}
+	// If the Fire button itself is focused, let pointer activation handle it
+	if (document.activeElement === cannonBtn) {
+		return;
 	}
+
+	e.preventDefault();
+	attemptFire('key');
+
+
+	// Visual press effect
+	cannonBtn.style.transform = "scale(0.95)";
+	setTimeout(() => cannonBtn.style.transform = "scale(1)", 100);
+}
 });
 
 // --- Shared High Score Logic (server-based) ---
