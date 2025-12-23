@@ -346,21 +346,18 @@ function initRunnerAudio() {
 function startRunnerPresence() {
 	if (!runnerOsc || !runnerGain || runnerPulseInterval) return;
 
-	const pulseFreq = 480;
-	const pulseGain = 0.06;
-	const pulseOnTime = 0.18;
-	const pulseOffTime = 0.32;
-
-	runnerOsc.frequency.setValueAtTime(pulseFreq, audio.ctx.currentTime);
+	const pulseGain = 0.07;
+	const pulseOnTime = 0.12;
+	const pulseOffTime = 0.18;
 
 	runnerPulseInterval = setInterval(() => {
 		const now = audio.ctx.currentTime;
 
 		runnerGain.gain.cancelScheduledValues(now);
 		runnerGain.gain.setValueAtTime(0, now);
-		runnerGain.gain.linearRampToValueAtTime(pulseGain, now + 0.02);
+		runnerGain.gain.linearRampToValueAtTime(pulseGain, now + 0.015);
 		runnerGain.gain.setValueAtTime(pulseGain, now + pulseOnTime);
-		runnerGain.gain.linearRampToValueAtTime(0, now + pulseOnTime + 0.08);
+		runnerGain.gain.linearRampToValueAtTime(0, now + pulseOnTime + 0.06);
 	}, (pulseOnTime + pulseOffTime) * 1000);
 }
 
@@ -508,6 +505,27 @@ const ariaAnnouncer = document.getElementById('aria-announcer');
 
 
 let lastFireTimeMs = 0;
+
+function playRunnerExplosion() {
+	if (!audio.ctx) return;
+
+	const osc = audio.ctx.createOscillator();
+	const gain = audio.ctx.createGain();
+
+	osc.type = 'triangle';
+	osc.frequency.setValueAtTime(140, audio.ctx.currentTime);
+	osc.frequency.exponentialRampToValueAtTime(60, audio.ctx.currentTime + 0.35);
+
+	gain.gain.setValueAtTime(0.12, audio.ctx.currentTime);
+	gain.gain.exponentialRampToValueAtTime(0.001, audio.ctx.currentTime + 0.4);
+
+	osc.connect(gain);
+	gain.connect(audio.masterGain);
+
+	osc.start();
+	osc.stop(audio.ctx.currentTime + 0.45);
+}
+
 
 function attemptFire(source) {
 	if (!state.isActive) return;
@@ -1041,7 +1059,7 @@ function fireCannon() {
 		runnerRef = null;
 		stopRunnerPresence();
 
-		// audio.playRunnerHit();
+			playRunnerExplosion();
 		announceGameEvent('score', `Runner destroyed! Score: ${state.score}`, `${state.score}`);
 
 	} else {
