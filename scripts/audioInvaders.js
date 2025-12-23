@@ -373,10 +373,12 @@ function startDangerTone() {
 	if (energyAlertState === 'danger') return;
 	stopEnergyAlert();
 
+	alertOsc.detune.setValueAtTime(0, audio.ctx.currentTime);
+
 	energyAlertState = 'danger';
 
-	const lowFreq = 520;
-	const highFreq = 760;
+	const lowFreq = 360;
+	const highFreq = 520;
 	const riseTime = 0.7;
 	const pauseTime = 0.6;
 
@@ -390,8 +392,9 @@ function startDangerTone() {
 		alertOsc.frequency.linearRampToValueAtTime(highFreq, now + riseTime);
 
 		alertGain.gain.setValueAtTime(0, now);
-		alertGain.gain.linearRampToValueAtTime(0.07, now + 0.05);
-		alertGain.gain.setValueAtTime(0.07, now + riseTime - 0.1);
+alertGain.gain.linearRampToValueAtTime(0.045, now + 0.05);
+alertGain.gain.setValueAtTime(0.045, now + riseTime - 0.1);
+
 		alertGain.gain.linearRampToValueAtTime(0, now + riseTime);
 	}, (riseTime + pauseTime) * 1000);
 }
