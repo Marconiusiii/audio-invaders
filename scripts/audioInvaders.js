@@ -313,7 +313,8 @@ let runnerActive = false;
 let runnerRef = null;
 let runnerOsc = null;
 let runnerGain = null;
-
+let runnerPanner = null;
+let runnerPulseInterval = null;
 
 // --- ENERGY ALERT AUDIO (WARNING / DANGER) ---
 
@@ -329,30 +330,52 @@ function initRunnerAudio() {
 
 	runnerOsc = audio.ctx.createOscillator();
 	runnerGain = audio.ctx.createGain();
+	runnerPanner = audio.ctx.createStereoPanner();
 
-	runnerOsc.type = 'sine';
+	runnerOsc.type = 'sawtooth';
 	runnerGain.gain.value = 0;
+	runnerPanner.pan.value = 0;
 
 	runnerOsc.connect(runnerGain);
-	runnerGain.connect(audio.masterGain);
+	runnerGain.connect(runnerPanner);
+	runnerPanner.connect(audio.masterGain);
 
 	runnerOsc.start();
 }
 
 function startRunnerPresence() {
-	if (!runnerOsc || !runnerGain) return;
+	if (!runnerOsc || !runnerGain || runnerPulseInterval) return;
 
-	const now = audio.ctx.currentTime;
-	runnerGain.gain.cancelScheduledValues(now);
-	runnerGain.gain.linearRampToValueAtTime(0.035, now + 0.2);
+	const pulseFreq = 480;
+	const pulseGain = 0.06;
+	const pulseOnTime = 0.18;
+	const pulseOffTime = 0.32;
+
+	runnerOsc.frequency.setValueAtTime(pulseFreq, audio.ctx.currentTime);
+
+	runnerPulseInterval = setInterval(() => {
+		const now = audio.ctx.currentTime;
+
+		runnerGain.gain.cancelScheduledValues(now);
+		runnerGain.gain.setValueAtTime(0, now);
+		runnerGain.gain.linearRampToValueAtTime(pulseGain, now + 0.02);
+		runnerGain.gain.setValueAtTime(pulseGain, now + pulseOnTime);
+		runnerGain.gain.linearRampToValueAtTime(0, now + pulseOnTime + 0.08);
+	}, (pulseOnTime + pulseOffTime) * 1000);
 }
 
 function stopRunnerPresence() {
+	if (runnerPulseInterval) {
+		clearInterval(runnerPulseInterval);
+		runnerPulseInterval = null;
+	}
+
 	if (!runnerGain || !audio.ctx) return;
 
 	const now = audio.ctx.currentTime;
 	runnerGain.gain.cancelScheduledValues(now);
-	runnerGain.gain.linearRampToValueAtTime(0, now + 0.2);
+	runnerGain.gain.setValueAtTime(0, now);
+	if (runnerPanner) runnerPanner.pan.setValueAtTime(0, now);
 }
 
 
@@ -734,7 +757,8 @@ function spawnAlien() {
 
 function maybeSpawnRunner() {
 	if (runnerActive) return;
-	if (state.round < 11) return;
+	if (state.round < 1) return;
+
 
 	let spawnChance = 0.05;
 
@@ -830,9 +854,13 @@ function gameLoop(timestamp) {
 	state.aliens.forEach((alien, index) => {
 		if (alien.type === 'runner' && runnerOsc) {
 			const yRatio = Math.min(1, alien.y / GAME_HEIGHT);
-			const freq = 220 + (yRatio * 260);
+			const freq = 110 + (yRatio * 260);
 
 			runnerOsc.frequency.setValueAtTime(freq, audio.ctx.currentTime);
+		}
+		if (alien.type === 'runner' && runnerPanner) {
+			const pan = ((alien.x / GAME_WIDTH) * 2) - 1;
+			runnerPanner.pan.setValueAtTime(pan, audio.ctx.currentTime);
 		}
 
 		// Movement
