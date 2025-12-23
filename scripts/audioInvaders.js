@@ -336,6 +336,13 @@ function stopEnergyAlert() {
 		alertInterval = null;
 	}
 
+	if (audio.ctx && alertOsc) {
+		const now = audio.ctx.currentTime;
+		alertOsc.frequency.cancelScheduledValues(now);
+		alertOsc.frequency.setValueAtTime(0, now);
+		alertOsc.detune.setValueAtTime(0, now);
+	}
+
 	if (alertGain && audio.ctx) {
 		const now = audio.ctx.currentTime;
 		alertGain.gain.cancelScheduledValues(now);
@@ -346,6 +353,8 @@ function stopEnergyAlert() {
 }
 
 function startWarningTone() {
+	alertOsc.type = 'square';
+
 	if (energyAlertState === 'warning') return;
 	stopEnergyAlert();
 
@@ -356,20 +365,26 @@ function startWarningTone() {
 	const onTime = 0.6;
 	const offTime = 1.5;
 
-	alertOsc.frequency.setValueAtTime(baseFreq, audio.ctx.currentTime);
+alertInterval = setInterval(() => {
+	const now = audio.ctx.currentTime;
 
-	alertInterval = setInterval(() => {
-		const now = audio.ctx.currentTime;
+	alertOsc.frequency.cancelScheduledValues(now);
+	alertOsc.frequency.setValueAtTime(baseFreq, now);
+	alertOsc.detune.setValueAtTime(-12, now);
 
-		alertGain.gain.cancelScheduledValues(now);
-		alertGain.gain.setValueAtTime(0, now);
-		alertGain.gain.linearRampToValueAtTime(0.06, now + 0.02);
-		alertGain.gain.setValueAtTime(0.06, now + onTime);
-		alertGain.gain.linearRampToValueAtTime(0, now + onTime + 0.15);
-	}, (onTime + offTime) * 1000);
+	alertGain.gain.cancelScheduledValues(now);
+	alertGain.gain.setValueAtTime(0, now);
+	alertGain.gain.linearRampToValueAtTime(0.06, now + 0.02);
+	alertGain.gain.setValueAtTime(0.06, now + onTime);
+	alertGain.gain.linearRampToValueAtTime(0, now + onTime + 0.15);
+}, (onTime + offTime) * 1000);
+
 }
 
 function startDangerTone() {
+	alertOsc.type = 'square';
+	alertOsc.detune.setValueAtTime(0, audio.ctx.currentTime);
+
 	if (energyAlertState === 'danger') return;
 	stopEnergyAlert();
 
@@ -377,8 +392,8 @@ function startDangerTone() {
 
 	energyAlertState = 'danger';
 
-	const lowFreq = 360;
-	const highFreq = 520;
+	const lowFreq = 220;
+	const highFreq = 440;
 	const riseTime = 0.7;
 	const pauseTime = 0.6;
 
@@ -402,12 +417,12 @@ alertGain.gain.setValueAtTime(0.045, now + riseTime - 0.1);
 function updateEnergyAlert() {
 	if (!state.isActive) return;
 
-	if (state.energy <= 20) {
+	if (state.energy <= 10) {
 		startDangerTone();
 		return;
 	}
 
-	if (state.energy <= 60) {
+	if (state.energy <= 25) {
 		startWarningTone();
 		return;
 	}
