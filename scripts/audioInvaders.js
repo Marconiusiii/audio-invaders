@@ -309,6 +309,8 @@ class AudioEngine {
 const audio = new AudioEngine();
 
 let verbosityMode = 'original';
+let runnerActive = false;
+let runnerRef = null;
 
 
 // --- ENERGY ALERT AUDIO (WARNING / DANGER) ---
@@ -652,8 +654,6 @@ function updateStats() {
 function spawnAlien() {
 	const id = Date.now() + Math.random();
 
-	// Random Start Side (Left=0 or Right=GAME_WIDTH)
-	// Actually, let's have them sweep across.
 	// Spawn either far left or far right
 	const startLeft = Math.random() > 0.5;
 	
@@ -671,7 +671,6 @@ function spawnAlien() {
 	const jitterFactor = 1 + Math.random() * ramp;
 	const finalSpeedX = baseSpeedX * jitterFactor;
 
-	
 	// Tone jitter for this alien's beep pitch: subtle early, more distinct in later rounds
 	const toneBaseJitter = 10;
 	const toneMaxJitter = 80;
@@ -685,10 +684,10 @@ function spawnAlien() {
 		x: startLeft ? 0 : GAME_WIDTH,
 		y: 0,
 		toneOffset: toneOffset,
-		// Speed increases with round, with jitter applied between rounds 7-12
-		speedX: finalSpeedX, 
-		speedY: 15 + (state.round * 5), // Slowly falls
+		speedX: finalSpeedX,
+		speedY: 15 + (state.round * 5),
 		nextBeep: 0,
+		type: 'normal',
 		el: document.createElement('div')
 	};
 
@@ -697,8 +696,49 @@ function spawnAlien() {
 	state.aliens.push(alien);
 }
 
+function maybeSpawnRunner() {
+	if (runnerActive) return;
+	if (state.round < 11) return;
+
+	let spawnChance = 0.05;
+
+	if (state.round >= 14) {
+		spawnChance = 0.08;
+	}
+	if (state.round >= 18) {
+		spawnChance = 0.12;
+	}
+
+	if (Math.random() > spawnChance) return;
+
+	const startLeft = Math.random() > 0.5;
+	const baseSpeedX = (startLeft ? 1 : -1) * (140 + (state.round * 20));
+
+	const runner = {
+		id: Date.now() + Math.random(),
+		x: startLeft ? 0 : GAME_WIDTH,
+		y: 0,
+		toneOffset: 0,
+		speedX: baseSpeedX,
+		speedY: 20 + (state.round * 6),
+		nextBeep: 0,
+		type: 'runner',
+		el: document.createElement('div')
+	};
+
+	runner.el.className = 'alien runner';
+	gameBoard.appendChild(runner.el);
+	state.aliens.push(runner);
+
+	runnerActive = true;
+	runnerRef = runner;
+}
+
+
 function gameOver() {
 	state.isActive = false;
+	runnerActive = false;
+	runnerRef = null;
 	stopEnergyAlert();
 	audio.playBell(); // Ring bell at zero/end
 	announce(`Game over, man, game over! Final Score ${state.score}.`);
@@ -735,13 +775,15 @@ function gameLoop(timestamp) {
 	// Spawning Logic
 	state.spawnTimer -= dt;
 	if (state.spawnTimer <= 0) {
-		// After round 5, spawn multiple. Before that, usually one at a time.
 		const maxAliens = state.round >= 5 ? Math.min(3, Math.floor(state.round / 2)) : 1;
-		
+
 		if (state.aliens.length < maxAliens) {
 			spawnAlien();
 		}
-		state.spawnTimer = 2.0; // Wait before checking spawn again
+
+		maybeSpawnRunner();
+
+		state.spawnTimer = 2.0;
 	}
 
 	// Update Aliens
@@ -791,15 +833,24 @@ function gameLoop(timestamp) {
 		if (alien.y >= GAME_HEIGHT) {
 			state.aliens.splice(index, 1);
 			alien.el.remove();
-			state.energy -= 20;
-			audio.playAlienExplosion();
-			announceGameEvent('other', 'Kaboom! Energy lost.');
+
+			if (alien.type === 'runner') {
+				state.energy -= 30;
+				runnerActive = false;
+				runnerRef = null;
+				// audio.playRunnerImpact();
+			} else {
+				state.energy -= 20;
+				audio.playAlienExplosion();
+				announceGameEvent('other', 'Kaboom! Energy lost.');
+			}
+
 			updateStats();
 			updateEnergyAlert();
 
-			
 			if (state.energy <= 0) gameOver();
 		}
+
 	});
 
 	// Round Progression (Simple time based or score based)
@@ -870,71 +921,79 @@ function fireCannon() {
 	const targets = state.aliens.filter(a => Math.abs(a.x - CENTER_X) < HIT_THRESHOLD);
 
 
-	if (targets.length > 0) {
-		// Hit the lowest one (closest threat)
-		targets.sort((a, b) => b.y - a.y);
-		const target = targets[0]; // The one closest to bottom
-
-		// Find index in main array
-		hitIndex = state.aliens.indexOf(target);
-
-		if (state.round >= 5) {
-			streak += 1;
-		}
-
-		// Success!
-// Visual: laser beam to alien
-showLaserBeam(target.y);
-
-// Visual: alien explosion
-showAlienExplosion(target.x, target.y);
-
-// Remove alien
-state.aliens.splice(hitIndex, 1);
-target.el.remove();
-
-state.score += 100;
-
-if (state.round <= 5) {
-	state.energy = Math.min(100, state.energy + 10);
-	audio.playHit();
-	announceGameEvent('score', `Hit! Score: ${state.score}`, `${state.score}`);
-
-} else {
-	state.energy = Math.min(175, state.energy + 10);
-
-	if (streak === 3) {
-		if (state.energy <= 160) {
-			state.energy = Math.min(175, state.energy + 15);
-			announceGameEvent('other', '+15 Energy Boost!');
-
-		} else {
-			state.energy = 175;
-			announceGameEvent('other', 'Max Energy!');
-		}
-
-		audio.playPowerUp();
-		streak = 0;
-	} else {
-		audio.playHit();
-		announceGameEvent('score', `Hit! Score: ${state.score}`, `${state.score}`);
-
-	}
-}
-
-	} else {
+	if (targets.length === 0) {
 		// Miss
 		state.energy -= 5;
 		streak = 0;
 		audio.playMiss();
 		announceGameEvent('other', 'Miss!');
 
-		
-		// Visual feedback on button
 		cannonBtn.classList.add('misfire');
 		setTimeout(() => cannonBtn.classList.remove('misfire'), 200);
 
 		if (state.energy <= 0) gameOver();
+
+		updateStats();
+		updateEnergyAlert();
+		return;
+	}
+
+	// Hit path
+	targets.sort((a, b) => b.y - a.y);
+	const target = targets[0];
+	const hitIndex = state.aliens.indexOf(target);
+
+	if (state.round >= 5) {
+		streak += 1;
+	}
+
+	showLaserBeam(target.y);
+	showAlienExplosion(target.x, target.y);
+
+	state.aliens.splice(hitIndex, 1);
+	target.el.remove();
+
+	if (target.type === 'runner') {
+		state.score += 200;
+
+		if (state.energy <= 155) {
+			state.energy += 20;
+		} else {
+			state.energy = 175;
+		}
+
+		runnerActive = false;
+		runnerRef = null;
+
+		// audio.playRunnerHit();
+		announceGameEvent('score', `Runner destroyed! Score: ${state.score}`, `${state.score}`);
+
+	} else {
+		state.score += 100;
+
+		if (state.round <= 5) {
+			state.energy = Math.min(100, state.energy + 10);
+			audio.playHit();
+			announceGameEvent('score', `Hit! Score: ${state.score}`, `${state.score}`);
+		} else {
+			state.energy = Math.min(175, state.energy + 10);
+
+			if (streak === 3) {
+				if (state.energy <= 160) {
+					state.energy = Math.min(175, state.energy + 15);
+					announceGameEvent('other', '+15 Energy Boost!');
+				} else {
+					state.energy = 175;
+					announceGameEvent('other', 'Max Energy!');
+				}
+
+				audio.playPowerUp();
+				streak = 0;
+			} else {
+				audio.playHit();
+				announceGameEvent('score', `Hit! Score: ${state.score}`, `${state.score}`);
+			}
+		}
 	}
 
 	updateStats();
