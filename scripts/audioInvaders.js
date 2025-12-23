@@ -963,8 +963,6 @@ function fireCannon() {
 	// We need to find if ANY alien is currently in the center zone
 	// Center X is GAME_WIDTH / 2.
 	// Tolerance is HIT_THRESHOLD.
-
-	let hitIndex = -1;
 	
 	// Filter for aliens in the zone
 	const targets = state.aliens.filter(a => Math.abs(a.x - CENTER_X) < HIT_THRESHOLD);
