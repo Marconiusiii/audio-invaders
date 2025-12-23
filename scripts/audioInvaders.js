@@ -311,6 +311,8 @@ const audio = new AudioEngine();
 let verbosityMode = 'original';
 let runnerActive = false;
 let runnerRef = null;
+let runnerOsc = null;
+let runnerGain = null;
 
 
 // --- ENERGY ALERT AUDIO (WARNING / DANGER) ---
@@ -319,6 +321,40 @@ let alertOsc = null;
 let alertGain = null;
 let alertInterval = null;
 let energyAlertState = 'none'; // 'none' | 'warning' | 'danger'
+
+//Runner Audio Setup
+
+function initRunnerAudio() {
+	if (!audio.ctx) return;
+
+	runnerOsc = audio.ctx.createOscillator();
+	runnerGain = audio.ctx.createGain();
+
+	runnerOsc.type = 'sine';
+	runnerGain.gain.value = 0;
+
+	runnerOsc.connect(runnerGain);
+	runnerGain.connect(audio.masterGain);
+
+	runnerOsc.start();
+}
+
+function startRunnerPresence() {
+	if (!runnerOsc || !runnerGain) return;
+
+	const now = audio.ctx.currentTime;
+	runnerGain.gain.cancelScheduledValues(now);
+	runnerGain.gain.linearRampToValueAtTime(0.035, now + 0.2);
+}
+
+function stopRunnerPresence() {
+	if (!runnerGain || !audio.ctx) return;
+
+	const now = audio.ctx.currentTime;
+	runnerGain.gain.cancelScheduledValues(now);
+	runnerGain.gain.linearRampToValueAtTime(0, now + 0.2);
+}
+
 
 function initEnergyAlertAudio() {
 	if (!audio.ctx) return;
@@ -731,6 +767,8 @@ function maybeSpawnRunner() {
 	state.aliens.push(runner);
 
 	runnerActive = true;
+	startRunnerPresence();
+
 	runnerRef = runner;
 }
 
@@ -739,6 +777,8 @@ function gameOver() {
 	state.isActive = false;
 	runnerActive = false;
 	runnerRef = null;
+	stopRunnerPresence();
+
 	stopEnergyAlert();
 	audio.playBell(); // Ring bell at zero/end
 	announce(`Game over, man, game over! Final Score ${state.score}.`);
@@ -788,6 +828,13 @@ function gameLoop(timestamp) {
 
 	// Update Aliens
 	state.aliens.forEach((alien, index) => {
+		if (alien.type === 'runner' && runnerOsc) {
+			const yRatio = Math.min(1, alien.y / GAME_HEIGHT);
+			const freq = 220 + (yRatio * 260);
+
+			runnerOsc.frequency.setValueAtTime(freq, audio.ctx.currentTime);
+		}
+
 		// Movement
 		alien.x += alien.speedX * dt;
 		alien.y += alien.speedY * dt;
@@ -838,6 +885,8 @@ function gameLoop(timestamp) {
 				state.energy -= 30;
 				runnerActive = false;
 				runnerRef = null;
+				stopRunnerPresence();
+
 				// audio.playRunnerImpact();
 			} else {
 				state.energy -= 20;
@@ -964,6 +1013,7 @@ function fireCannon() {
 
 		runnerActive = false;
 		runnerRef = null;
+		stopRunnerPresence();
 
 		// audio.playRunnerHit();
 		announceGameEvent('score', `Runner destroyed! Score: ${state.score}`, `${state.score}`);
@@ -1006,6 +1056,7 @@ function fireCannon() {
 document.getElementById('start-btn').addEventListener('click', () => {
 	audio.init();
 	initEnergyAlertAudio();
+	initRunnerAudio();
 
 	document.getElementById('cannon-btn').removeAttribute('inert');
 	document.getElementById('cannon-btn').focus();
