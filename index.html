@@ -73,11 +73,28 @@
 			</div>
 		</form>
 
+<details id="settings">
+<summary>Game Settings</summary>
+
+<p>Low verbosity will only  announce Round and Score updates. If set to Off, use only audio cues and the Energy, Score, and Round shortcuts to get updates.</p>
+<fieldset>
+<legend>Speech Verbosity</legend>
+
+<input type="radio" name="verbosity" value="original" id="verb1" checked>
+<label for="verb1">Original</label>
+
+<input type="radio" name="verbosity" value="low" id="verb2">
+<label for="verb2">Low</label>
+
+<input type="radio" name="verbosity" value="off" id="verb3">
+<label for="verb3">Off</label>
+</fieldset>
+</details>
+
 	<button id="start-btn" class="btn-primary">START GAME</button>
 	</div>
 
-	<!-- Accessibility Live Region -->
-	<div id="aria-announcer" class="screen-reader-only" aria-live="assertive"></div>
+
 </main>
 <footer id="footer" class="footer-panel">
 	<nav aria-label="Footer">
@@ -92,8 +109,9 @@
 	<p class="footer-copy small muted">
 		&copy;2025 Chancey Fleet and Marco Salsiccia - v.1.2.1</p>
 </footer>
+	<!-- Accessibility Live Region -->
+	<div id="aria-announcer" class="screen-reader-only" aria-live="assertive"></div>
 
 <script src="scripts/audioInvaders.js"></script>
-
 </body>
 </html>

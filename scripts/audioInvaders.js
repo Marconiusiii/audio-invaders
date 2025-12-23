@@ -308,6 +308,9 @@ class AudioEngine {
 */
 const audio = new AudioEngine();
 
+let verbosityMode = 'original';
+
+
 // --- ENERGY ALERT AUDIO (WARNING / DANGER) ---
 
 let alertOsc = null;
@@ -468,6 +471,14 @@ const cannonBtn = document.getElementById('cannon-btn');
 const startOverlay = document.getElementById('start-overlay');
 const hsDiv = document.getElementById('high-scores');
 const footer = document.getElementById('footer');
+const verbosityRadios = document.querySelectorAll('input[name="verbosity"]');
+
+verbosityRadios.forEach((radio) => {
+	radio.addEventListener('change', () => {
+		verbosityMode = radio.value;
+	});
+});
+
 
 let state = {
 	isActive: false,
@@ -565,6 +576,26 @@ function destroyHud() {
 	energyDisplay = null;
 	roundDisplay = null;
 }
+
+function announceGameEvent(type, originalMessage, lowMessage = '') {
+	if (verbosityMode === 'off') {
+		return;
+	}
+
+	if (verbosityMode === 'low') {
+		if (type !== 'round' && type !== 'score') {
+			return;
+		}
+
+		if (lowMessage) {
+			announce(lowMessage);
+			return;
+		}
+	}
+
+	announce(originalMessage);
+}
+
 
 function announce(text) {
 	ariaAnnouncer.textContent = text;
@@ -762,7 +793,7 @@ function gameLoop(timestamp) {
 			alien.el.remove();
 			state.energy -= 20;
 			audio.playAlienExplosion();
-			announce("Kaboom! Energy lost.");
+			announceGameEvent('other', 'Kaboom! Energy lost.');
 			updateStats();
 			updateEnergyAlert();
 
@@ -776,7 +807,7 @@ function gameLoop(timestamp) {
 	const expectedRound = Math.floor(state.score / 500) + 1;
 	if (expectedRound > state.round) {
 		state.round = expectedRound;
-		announce(`Round ${state.round}`);
+		announceGameEvent('round', `Round ${state.round}`);
 		updateStats();
 		updateEnergyAlert();
 
@@ -867,24 +898,27 @@ state.score += 100;
 if (state.round <= 5) {
 	state.energy = Math.min(100, state.energy + 10);
 	audio.playHit();
-	announce(`Hit! ${state.score}`);
+	announceGameEvent('score', `Hit! Score: ${state.score}`, `${state.score}`);
+
 } else {
 	state.energy = Math.min(175, state.energy + 10);
 
 	if (streak === 3) {
 		if (state.energy <= 160) {
 			state.energy = Math.min(175, state.energy + 15);
-			announce('+15 Energy Bonus!');
+			announceGameEvent('other', '+15 Energy Boost!');
+
 		} else {
 			state.energy = 175;
-			announce('Max Energy!');
+			announceGameEvent('other', 'Max Energy!');
 		}
 
 		audio.playPowerUp();
 		streak = 0;
 	} else {
 		audio.playHit();
-		announce(`Hit! ${state.score}`);
+		announceGameEvent('score', `Hit! Score: ${state.score}`, `${state.score}`);
+
 	}
 }
 
@@ -893,7 +927,8 @@ if (state.round <= 5) {
 		state.energy -= 5;
 		streak = 0;
 		audio.playMiss();
-		announce("Miss!");
+		announceGameEvent('other', 'Miss!');
+
 		
 		// Visual feedback on button
 		cannonBtn.classList.add('misfire');
@@ -936,7 +971,7 @@ document.getElementById('start-btn').addEventListener('click', () => {
 
 
 	startOverlay.style.display = 'none';
-	announce("Game Started. Listen for the beeps.");
+	announceGameEvent('other', "Game Started, listen for the beeps!");
 	createHud();
 	updateStats();
 	updateEnergyAlert();
