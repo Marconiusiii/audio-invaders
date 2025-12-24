@@ -344,20 +344,34 @@ function initRunnerAudio() {
 }
 
 function startRunnerPresence() {
-	if (!runnerOsc || !runnerGain || runnerPulseInterval) return;
+	if (!runnerOsc || !runnerGain || !audio.ctx || runnerPulseInterval) return;
 
-	const pulseGain = 0.07;
-	const pulseOnTime = 0.12;
-	const pulseOffTime = 0.18;
+	const pulseOnTime = 0.11;
+	const pulseOffTime = 0.26;
+
+	const baseGain = 0.04;
+	const maxGain = 0.11;
 
 	runnerPulseInterval = setInterval(() => {
 		const now = audio.ctx.currentTime;
 
+		const yRatio = runnerRef ? Math.min(1, runnerRef.y / GAME_HEIGHT) : 0;
+		const dangerCurve = Math.pow(yRatio, 2.6);
+		const targetGain = baseGain + (maxGain - baseGain) * dangerCurve;
+
 		runnerGain.gain.cancelScheduledValues(now);
+
+		// hard reset to silence so it cannot smear into a buzz
 		runnerGain.gain.setValueAtTime(0, now);
-		runnerGain.gain.linearRampToValueAtTime(pulseGain, now + 0.015);
-		runnerGain.gain.setValueAtTime(pulseGain, now + pulseOnTime);
-		runnerGain.gain.linearRampToValueAtTime(0, now + pulseOnTime + 0.06);
+
+		// quick attack to target gain
+		runnerGain.gain.linearRampToValueAtTime(targetGain, now + 0.0012);
+
+		// hold briefly
+		runnerGain.gain.setValueAtTime(targetGain, now + pulseOnTime);
+
+		// fast release back to silence, before the off period
+		runnerGain.gain.linearRampToValueAtTime(0, now + pulseOnTime + 0.012);
 	}, (pulseOnTime + pulseOffTime) * 1000);
 }
 
@@ -896,9 +910,9 @@ function spawnAlien() {
 
 function maybeSpawnRunner() {
 	if (runnerActive) return;
-	if (state.round < 1) return;
+	if (state.round < 10) return;
 
-	let spawnChance = 25; //was 0.05
+	let spawnChance = 0.05; //was 0.05
 
 	if (state.round >= 14) {
 		spawnChance = 0.08;
@@ -991,9 +1005,15 @@ function gameLoop(timestamp) {
 
 	// Update Aliens
 	state.aliens.forEach((alien, index) => {
-		// Movement
-		alien.x += alien.speedX * dt;
-		alien.y += alien.speedY * dt;
+// Movement
+if (alien.type === 'runner') {
+	const roundScale = 1 + (state.round * 0.03);
+	alien.x += alien.speedX * roundScale * dt;
+	alien.y += alien.speedY * roundScale * dt;
+} else {
+	alien.x += alien.speedX * dt;
+	alien.y += alien.speedY * dt;
+}
 
 		// Bounce off walls
 		if (alien.x <= 0 || alien.x >= GAME_WIDTH) {
