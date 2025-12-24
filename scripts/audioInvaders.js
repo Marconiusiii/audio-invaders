@@ -604,8 +604,7 @@ function playRunnerImpactExplosion(panVal = 0) {
 
 	noiseFilter.type = 'lowpass';
 	noiseFilter.frequency.setValueAtTime(700, now);
-	noiseFilter.frequency.exponentialRampToValueAt(180, now + 0.9);
-
+	noiseFilter.frequency.exponentialRampToValueAtTime(180, now + 0.9);
 	noiseGain.gain.setValueAtTime(0.45, now);
 	noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
 
