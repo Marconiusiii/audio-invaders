@@ -509,21 +509,41 @@ let lastFireTimeMs = 0;
 function playRunnerExplosion() {
 	if (!audio.ctx) return;
 
-	const osc = audio.ctx.createOscillator();
-	const gain = audio.ctx.createGain();
+	const now = audio.ctx.currentTime;
 
-	osc.type = 'triangle';
-	osc.frequency.setValueAtTime(140, audio.ctx.currentTime);
-	osc.frequency.exponentialRampToValueAtTime(60, audio.ctx.currentTime + 0.35);
+	// Sub-bass impact (mass)
+	const thumpOsc = audio.ctx.createOscillator();
+	const thumpGain = audio.ctx.createGain();
 
-	gain.gain.setValueAtTime(0.12, audio.ctx.currentTime);
-	gain.gain.exponentialRampToValueAtTime(0.001, audio.ctx.currentTime + 0.4);
+	thumpOsc.type = 'sine';
+	thumpOsc.frequency.setValueAtTime(50, now);
+	thumpOsc.frequency.exponentialRampToValueAtTime(28, now + 0.18);
 
-	osc.connect(gain);
-	gain.connect(audio.masterGain);
+	thumpGain.gain.setValueAtTime(0.28, now);
+	thumpGain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
 
-	osc.start();
-	osc.stop(audio.ctx.currentTime + 0.45);
+	thumpOsc.connect(thumpGain);
+	thumpGain.connect(audio.masterGain);
+
+	thumpOsc.start(now);
+	thumpOsc.stop(now + 0.24);
+
+	// Explosion body (grit and spread)
+	const bodyOsc = audio.ctx.createOscillator();
+	const bodyGain = audio.ctx.createGain();
+
+	bodyOsc.type = 'sawtooth';
+	bodyOsc.frequency.setValueAtTime(180, now);
+	bodyOsc.frequency.exponentialRampToValueAtTime(65, now + 0.45);
+
+	bodyGain.gain.setValueAtTime(0.16, now);
+	bodyGain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+
+	bodyOsc.connect(bodyGain);
+	bodyGain.connect(audio.masterGain);
+
+	bodyOsc.start(now);
+	bodyOsc.stop(now + 0.55);
 }
 
 
@@ -777,7 +797,6 @@ function maybeSpawnRunner() {
 	if (runnerActive) return;
 	if (state.round < 1) return;
 
-
 	let spawnChance = 0.05;
 
 	if (state.round >= 14) {
@@ -807,7 +826,6 @@ function maybeSpawnRunner() {
 	runner.el.className = 'alien runner';
 	gameBoard.appendChild(runner.el);
 	state.aliens.push(runner);
-
 	runnerActive = true;
 	startRunnerPresence();
 
@@ -859,7 +877,9 @@ function gameLoop(timestamp) {
 	if (state.spawnTimer <= 0) {
 		const maxAliens = state.round >= 5 ? Math.min(3, Math.floor(state.round / 2)) : 1;
 
-		if (state.aliens.length < maxAliens) {
+		const normalAlienCount = state.aliens.filter(a => a.type !== 'runner').length;
+
+		if (normalAlienCount < maxAliens) {
 			spawnAlien();
 		}
 
@@ -870,17 +890,6 @@ function gameLoop(timestamp) {
 
 	// Update Aliens
 	state.aliens.forEach((alien, index) => {
-		if (alien.type === 'runner' && runnerOsc) {
-			const yRatio = Math.min(1, alien.y / GAME_HEIGHT);
-			const freq = 110 + (yRatio * 260);
-
-			runnerOsc.frequency.setValueAtTime(freq, audio.ctx.currentTime);
-		}
-		if (alien.type === 'runner' && runnerPanner) {
-			const pan = ((alien.x / GAME_WIDTH) * 2) - 1;
-			runnerPanner.pan.setValueAtTime(pan, audio.ctx.currentTime);
-		}
-
 		// Movement
 		alien.x += alien.speedX * dt;
 		alien.y += alien.speedY * dt;
@@ -896,30 +905,41 @@ function gameLoop(timestamp) {
 		alien.el.style.top = (alien.y / GAME_HEIGHT * 100) + '%';
 
 		// Audio Logic (Beeping)
-		if (timestamp > alien.nextBeep) {
-			// Pan Value: -1 (Left) to 1 (Right)
-			const pan = ((alien.x / GAME_WIDTH) * 2) - 1;
-			const yPercent = (alien.y / GAME_HEIGHT) * 100;
-			
-			audio.playAlienBeep(pan, yPercent, alien.toneOffset);
+		// Audio Logic (Beeping / Runner Presence)
+		if (alien.type === 'runner') {
+			// Keep runnerRef aligned to the live runner object
+			runnerRef = alien;
 
-			// Calculate next interval
-			// Closer to bottom = faster, and later rounds / more aliens
-			// also tighten the timing so chaos feels dense but readable.
-			const baseInterval = 1000 - (alien.y / GAME_HEIGHT * 850);
-			
-			// Difficulty factor: more rounds + more simultaneous aliens
-			const roundFactor = Math.max(0, state.round - 1);
-			const densityFactor = Math.max(0, state.aliens.length - 1);
-			const difficulty = 1 + (roundFactor * 0.15) + (densityFactor * 0.1);
-			
-			// Compress the interval by difficulty, but never below ~120ms
-			const adjustedInterval = Math.max(120, baseInterval / difficulty);
-			
-			// Arrhythmic Jitter: +/- 30% randomness around the adjusted interval
-			const jitter = adjustedInterval * 0.3 * (Math.random() - 0.5);
-			
-			alien.nextBeep = timestamp + (adjustedInterval + jitter);
+			// Runner audio updates (pan + pitch)
+			if (runnerPanner && runnerOsc && audio.ctx) {
+				const panVal = ((alien.x / GAME_WIDTH) * 2) - 1;
+				const yRatio = Math.min(1, alien.y / GAME_HEIGHT);
+				const freq = 110 + (yRatio * 260);
+
+				runnerPanner.pan.setValueAtTime(panVal, audio.ctx.currentTime);
+				runnerOsc.frequency.setValueAtTime(freq, audio.ctx.currentTime);
+			}
+
+			// No beeps for runner (pulse interval is its pattern)
+		} else {
+			// Normal alien beep
+			const panVal = ((alien.x / GAME_WIDTH) * 2) - 1;
+			const yPercent = Math.max(0, Math.min(100, (alien.y / GAME_HEIGHT) * 100));
+
+			if (timestamp >= alien.nextBeep) {
+				audio.playAlienBeep(panVal, yPercent, alien.toneOffset);
+
+				const baseInterval = 1000 - (alien.y / GAME_HEIGHT * 850);
+
+				const roundFactor = Math.max(0, state.round - 1);
+				const densityFactor = Math.max(0, state.aliens.length - 1);
+				const difficulty = 1 + (roundFactor * 0.15) + (densityFactor * 0.1);
+
+				const adjustedInterval = Math.max(120, baseInterval / difficulty);
+				const jitter = adjustedInterval * 0.3 * (Math.random() - 0.5);
+
+				alien.nextBeep = timestamp + (adjustedInterval + jitter);
+			}
 		}
 
 		// Fail Condition (Reaches Bottom)
@@ -1010,6 +1030,8 @@ function fireCannon() {
 	// Center X is GAME_WIDTH / 2.
 	// Tolerance is HIT_THRESHOLD.
 	
+
+
 	// Filter for aliens in the zone
 	const targets = state.aliens.filter(a => Math.abs(a.x - CENTER_X) < HIT_THRESHOLD);
 
