@@ -1071,7 +1071,8 @@ if (alien.type === 'runner') {
 			alien.el.remove();
 
 			if (alien.type === 'runner') {
-					const runPanVal = ((alien.x / GAME_WIDTH) * 2) - 1;
+				const runPanVal = ((alien.x / GAME_WIDTH) * 2) - 1;
+				showRunnerExplosion(alien.x, alien.y);
 				state.energy -= 30;
 				runnerActive = false;
 				runnerRef = null;
@@ -1143,6 +1144,18 @@ function showAlienExplosion(x, y) {
 	setTimeout(() => explosion.remove(), 500);
 }
 
+function showRunnerExplosion(x, y) {
+	const explosion = document.createElement('div');
+	explosion.className = 'runner-explode';
+
+	explosion.style.left = (x / GAME_WIDTH * 100) + '%';
+	explosion.style.top = (y / GAME_HEIGHT * 100) + '%';
+
+	gameBoard.appendChild(explosion);
+
+	setTimeout(() => explosion.remove(), 650);
+}
+
 function fireCannon() {
 	if (!state.isActive) return;
 	
@@ -1186,7 +1199,11 @@ function fireCannon() {
 	}
 
 	showLaserBeam(target.y);
-	showAlienExplosion(target.x, target.y);
+	if (target.type === 'runner') {
+		showRunnerExplosion(target.x, target.y);
+	} else {
+		showAlienExplosion(target.x, target.y);
+	}
 
 	state.aliens.splice(hitIndex, 1);
 	target.el.remove();
