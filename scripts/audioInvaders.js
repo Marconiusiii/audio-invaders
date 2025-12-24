@@ -509,43 +509,142 @@ let lastFireTimeMs = 0;
 function playRunnerExplosion() {
 	if (!audio.ctx) return;
 
-	const now = audio.ctx.currentTime;
+	const now = audio.ctx.currentTime + 0.03;
 
-	// Sub-bass impact (mass)
+	// --- Low-frequency impact (weight) ---
 	const thumpOsc = audio.ctx.createOscillator();
 	const thumpGain = audio.ctx.createGain();
 
 	thumpOsc.type = 'sine';
-	thumpOsc.frequency.setValueAtTime(50, now);
-	thumpOsc.frequency.exponentialRampToValueAtTime(28, now + 0.18);
+	thumpOsc.frequency.setValueAtTime(42, now);
+	thumpOsc.frequency.exponentialRampToValueAtTime(18, now + 0.35);
 
-	thumpGain.gain.setValueAtTime(0.28, now);
-	thumpGain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+	thumpGain.gain.setValueAtTime(0.45, now);
+	thumpGain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
 
 	thumpOsc.connect(thumpGain);
 	thumpGain.connect(audio.masterGain);
 
 	thumpOsc.start(now);
-	thumpOsc.stop(now + 0.24);
+	thumpOsc.stop(now + 0.42);
 
-	// Explosion body (grit and spread)
-	const bodyOsc = audio.ctx.createOscillator();
-	const bodyGain = audio.ctx.createGain();
+	// --- Noise burst (destruction, not a tone) ---
+	const noiseBuffer = audio.ctx.createBuffer(
+		1,
+		audio.ctx.sampleRate * 0.6,
+		audio.ctx.sampleRate
+	);
 
-	bodyOsc.type = 'sawtooth';
-	bodyOsc.frequency.setValueAtTime(180, now);
-	bodyOsc.frequency.exponentialRampToValueAtTime(65, now + 0.45);
+	const noiseData = noiseBuffer.getChannelData(0);
+	for (let i = 0; i < noiseData.length; i++) {
+		noiseData[i] = (Math.random() * 2 - 1) * (1 - i / noiseData.length);
+	}
 
-	bodyGain.gain.setValueAtTime(0.16, now);
-	bodyGain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+	const noiseSource = audio.ctx.createBufferSource();
+	const noiseGain = audio.ctx.createGain();
+	const noiseFilter = audio.ctx.createBiquadFilter();
 
-	bodyOsc.connect(bodyGain);
-	bodyGain.connect(audio.masterGain);
+	noiseSource.buffer = noiseBuffer;
 
-	bodyOsc.start(now);
-	bodyOsc.stop(now + 0.55);
+	noiseFilter.type = 'lowpass';
+	noiseFilter.frequency.setValueAtTime(900, now);
+	noiseFilter.frequency.exponentialRampToValueAtTime(250, now + 0.5);
+
+	noiseGain.gain.setValueAtTime(0.35, now);
+	noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+
+	noiseSource.connect(noiseFilter);
+	noiseFilter.connect(noiseGain);
+	noiseGain.connect(audio.masterGain);
+
+	noiseSource.start(now);
+	noiseSource.stop(now + 0.6);
 }
 
+function playRunnerImpactExplosion(panVal = 0) {
+	if (!audio.ctx) return;
+
+	const now = audio.ctx.currentTime + 0.02;
+
+	// --- Sub-bass rumble (felt impact) ---
+	const subOsc = audio.ctx.createOscillator();
+	const subGain = audio.ctx.createGain();
+	const subPan = audio.ctx.createStereoPanner();
+
+	subOsc.type = 'sine';
+	subOsc.frequency.setValueAtTime(28, now);
+	subOsc.frequency.exponentialRampToValueAtTime(14, now + 0.7);
+
+	subGain.gain.setValueAtTime(0.7, now);
+	subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+
+	subPan.pan.setValueAtTime(panVal, now);
+
+	subOsc.connect(subGain);
+	subGain.connect(subPan);
+	subPan.connect(audio.masterGain);
+
+	subOsc.start(now);
+	subOsc.stop(now + 0.85);
+
+	// --- Mid-bass slam (weight + crack) ---
+	const slamOsc = audio.ctx.createOscillator();
+	const slamGain = audio.ctx.createGain();
+	const slamPan = audio.ctx.createStereoPanner();
+
+	slamOsc.type = 'triangle';
+	slamOsc.frequency.setValueAtTime(55, now);
+	slamOsc.frequency.exponentialRampToValueAtTime(24, now + 0.45);
+
+	slamGain.gain.setValueAtTime(0.45, now);
+	slamGain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+
+	slamPan.pan.setValueAtTime(panVal, now);
+
+	slamOsc.connect(slamGain);
+	slamGain.connect(slamPan);
+	slamPan.connect(audio.masterGain);
+
+	slamOsc.start(now);
+	slamOsc.stop(now + 0.55);
+
+	// --- Debris / destruction noise ---
+	const noiseBuffer = audio.ctx.createBuffer(
+		1,
+		audio.ctx.sampleRate * 1.2,
+		audio.ctx.sampleRate
+	);
+
+	const noiseData = noiseBuffer.getChannelData(0);
+	for (let i = 0; i < noiseData.length; i++) {
+		const fade = 1 - (i / noiseData.length);
+		noiseData[i] = (Math.random() * 2 - 1) * fade;
+	}
+
+	const noiseSource = audio.ctx.createBufferSource();
+	const noiseGain = audio.ctx.createGain();
+	const noiseFilter = audio.ctx.createBiquadFilter();
+	const noisePan = audio.ctx.createStereoPanner();
+
+	noiseSource.buffer = noiseBuffer;
+
+	noiseFilter.type = 'lowpass';
+	noiseFilter.frequency.setValueAtTime(650, now);
+	noiseFilter.frequency.exponentialRampToValueAtTime(160, now + 1.1);
+
+	noiseGain.gain.setValueAtTime(0.5, now);
+	noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+
+	noisePan.pan.setValueAtTime(panVal, now);
+
+	noiseSource.connect(noiseFilter);
+	noiseFilter.connect(noiseGain);
+	noiseGain.connect(noisePan);
+	noisePan.connect(audio.masterGain);
+
+	noiseSource.start(now);
+	noiseSource.stop(now + 1.2);
+}
 
 function attemptFire(source) {
 	if (!state.isActive) return;
@@ -797,7 +896,7 @@ function maybeSpawnRunner() {
 	if (runnerActive) return;
 	if (state.round < 1) return;
 
-	let spawnChance = 0.05;
+	let spawnChance = 25; //was 0.05
 
 	if (state.round >= 14) {
 		spawnChance = 0.08;
@@ -816,8 +915,8 @@ function maybeSpawnRunner() {
 		x: startLeft ? 0 : GAME_WIDTH,
 		y: 0,
 		toneOffset: 0,
-		speedX: baseSpeedX,
-		speedY: 20 + (state.round * 6),
+		speedX: baseSpeedX * (1.4 + state.round * 0.06),
+		speedY: 28 + (state.round * 7),
 		nextBeep: 0,
 		type: 'runner',
 		el: document.createElement('div')
@@ -948,10 +1047,12 @@ function gameLoop(timestamp) {
 			alien.el.remove();
 
 			if (alien.type === 'runner') {
+					const runPanVal = ((alien.x / GAME_WIDTH) * 2) - 1;
 				state.energy -= 30;
 				runnerActive = false;
 				runnerRef = null;
 				stopRunnerPresence();
+				playRunnerImpactExplosion(runPanVal);
 
 				// audio.playRunnerImpact();
 			} else {
@@ -1081,7 +1182,9 @@ function fireCannon() {
 		runnerRef = null;
 		stopRunnerPresence();
 
-			playRunnerExplosion();
+			const panVal = ((target.x / GAME_WIDTH) * 2) - 1;
+			playRunnerExplosion(panVal);
+
 		announceGameEvent('score', `Runner destroyed! Score: ${state.score}`, `${state.score}`);
 
 	} else {
