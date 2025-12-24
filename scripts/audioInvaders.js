@@ -566,52 +566,27 @@ function playRunnerImpactExplosion(panVal = 0) {
 
 	const now = audio.ctx.currentTime + 0.02;
 
-	// --- Sub-bass rumble (felt impact) ---
-	const subOsc = audio.ctx.createOscillator();
-	const subGain = audio.ctx.createGain();
-	const subPan = audio.ctx.createStereoPanner();
-
-	subOsc.type = 'sine';
-	subOsc.frequency.setValueAtTime(28, now);
-	subOsc.frequency.exponentialRampToValueAtTime(14, now + 0.7);
-
-	subGain.gain.setValueAtTime(0.7, now);
-	subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
-
-	subPan.pan.setValueAtTime(panVal, now);
-
-	subOsc.connect(subGain);
-	subGain.connect(subPan);
-	subPan.connect(audio.masterGain);
-
-	subOsc.start(now);
-	subOsc.stop(now + 0.85);
-
-	// --- Mid-bass slam (weight + crack) ---
+	// --- Massive low-frequency slam ---
 	const slamOsc = audio.ctx.createOscillator();
 	const slamGain = audio.ctx.createGain();
-	const slamPan = audio.ctx.createStereoPanner();
 
-	slamOsc.type = 'triangle';
-	slamOsc.frequency.setValueAtTime(55, now);
-	slamOsc.frequency.exponentialRampToValueAtTime(24, now + 0.45);
+	slamOsc.type = 'sine';
+	slamOsc.frequency.setValueAtTime(34, now);
+	slamOsc.frequency.exponentialRampToValueAtTime(16, now + 0.55);
 
-	slamGain.gain.setValueAtTime(0.45, now);
-	slamGain.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
-
-	slamPan.pan.setValueAtTime(panVal, now);
+	slamGain.gain.setValueAtTime(0.6, now);
+	slamGain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
 
 	slamOsc.connect(slamGain);
-	slamGain.connect(slamPan);
-	slamPan.connect(audio.masterGain);
+	slamGain.connect(audio.masterGain);
 
 	slamOsc.start(now);
-	slamOsc.stop(now + 0.55);
+	slamOsc.stop(now + 0.65);
 
-	// --- Debris / destruction noise ---
+	// --- Long debris / destruction noise ---
 	const noiseBuffer = audio.ctx.createBuffer(
 		1,
-		audio.ctx.sampleRate * 1.2,
+		audio.ctx.sampleRate * 1.0,
 		audio.ctx.sampleRate
 	);
 
@@ -624,26 +599,54 @@ function playRunnerImpactExplosion(panVal = 0) {
 	const noiseSource = audio.ctx.createBufferSource();
 	const noiseGain = audio.ctx.createGain();
 	const noiseFilter = audio.ctx.createBiquadFilter();
-	const noisePan = audio.ctx.createStereoPanner();
 
 	noiseSource.buffer = noiseBuffer;
 
 	noiseFilter.type = 'lowpass';
-	noiseFilter.frequency.setValueAtTime(650, now);
-	noiseFilter.frequency.exponentialRampToValueAtTime(160, now + 1.1);
+	noiseFilter.frequency.setValueAtTime(700, now);
+	noiseFilter.frequency.exponentialRampToValueAt(180, now + 0.9);
 
-	noiseGain.gain.setValueAtTime(0.5, now);
-	noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
-
-	noisePan.pan.setValueAtTime(panVal, now);
+	noiseGain.gain.setValueAtTime(0.45, now);
+	noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
 
 	noiseSource.connect(noiseFilter);
 	noiseFilter.connect(noiseGain);
-	noiseGain.connect(noisePan);
-	noisePan.connect(audio.masterGain);
+	noiseGain.connect(audio.masterGain);
 
 	noiseSource.start(now);
-	noiseSource.stop(now + 1.2);
+	noiseSource.stop(now + 1.0);
+
+	// --- Sparks (high-frequency debris, longer decay) ---
+	const sparkBuffer = audio.ctx.createBuffer(
+		1,
+		audio.ctx.sampleRate * 0.6,
+		audio.ctx.sampleRate
+	);
+
+	const sparkData = sparkBuffer.getChannelData(0);
+	for (let i = 0; i < sparkData.length; i++) {
+		sparkData[i] = (Math.random() * 2 - 1);
+	}
+
+	const sparkSource = audio.ctx.createBufferSource();
+	const sparkGain = audio.ctx.createGain();
+	const sparkFilter = audio.ctx.createBiquadFilter();
+
+	sparkSource.buffer = sparkBuffer;
+
+	sparkFilter.type = 'highpass';
+	sparkFilter.frequency.setValueAtTime(1800, now);
+	sparkFilter.frequency.exponentialRampToValueAtTime(3200, now + 0.2);
+
+	sparkGain.gain.setValueAtTime(0.22, now);
+	sparkGain.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+
+	sparkSource.connect(sparkFilter);
+	sparkFilter.connect(sparkGain);
+	sparkGain.connect(audio.masterGain);
+
+	sparkSource.start(now + 0.04);
+	sparkSource.stop(now + 0.6);
 }
 
 function attemptFire(source) {
@@ -1053,8 +1056,6 @@ function gameLoop(timestamp) {
 				runnerRef = null;
 				stopRunnerPresence();
 				playRunnerImpactExplosion(runPanVal);
-
-				// audio.playRunnerImpact();
 			} else {
 				state.energy -= 20;
 				audio.playAlienExplosion();
