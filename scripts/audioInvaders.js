@@ -938,7 +938,9 @@ function maybeSpawnRunner() {
 		el: document.createElement('div')
 	};
 
-	runner.el.className = 'alien runner';
+//	runner.el.className = 'alien runner';
+	runner.el.classList.add('alien', 'runner');
+
 	gameBoard.appendChild(runner.el);
 	state.aliens.push(runner);
 	runnerActive = true;
