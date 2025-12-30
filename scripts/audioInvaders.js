@@ -1,4 +1,4 @@
-const API_URL_TEST = "api/testHighScores.php";
+const API_URL_TEST = "/api/testHighScores.php";
 const API_URL_PROD = "/api/highScores.php";
 
 const CURRENT_API_URL = API_URL_PROD; 
@@ -1391,6 +1391,7 @@ const hsCancelBtn = document.getElementById('hs-cancel-btn');
 let latestHighScores = [];
 let pendingScore = null;
 let startBtnFocusTimeoutId = null;
+let highScoreLocked = false;
 
 
 // Render the scores into the <ol>
@@ -1468,7 +1469,7 @@ function qualifiesForHighScore(score, scores) {
 	if (list.length < MAX_HIGH_SCORES) return true;
 
 	const lowest = list[list.length - 1].score;
-	return score > lowest;
+	return score >= lowest;
 }
 
 // Put the start overlay into "enter your initials" mode
@@ -1476,6 +1477,7 @@ function enterHighScorePrompt(score) {
 	if (!hsForm) return;
 
 	pendingScore = score;
+	highScoreLocked = true;
 
 	// Ensure overlay is visible
 	if (startOverlay) {
@@ -1502,7 +1504,9 @@ function enterHighScorePrompt(score) {
 
 // Restore overlay to normal "Game Over" state
 function exitHighScorePrompt() {
-	pendingScore = null;
+	if (!highScoreLocked) {
+		pendingScore = null;
+	}
 
 	if (hsForm) {
 		hsForm.hidden = true;
@@ -1584,6 +1588,7 @@ const payload = {
 				announce('Unable to save high score at this time.');
 			})
 			.finally(() => {
+				highScoreLocked = false;
 				exitHighScorePrompt();
 			});
 	});
@@ -1591,6 +1596,7 @@ const payload = {
 
 if (hsCancelBtn) {
 	hsCancelBtn.addEventListener('click', () => {
+		highScoreLocked = false;
 		exitHighScorePrompt();
 	});
 }
