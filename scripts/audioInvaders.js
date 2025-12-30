@@ -315,6 +315,8 @@ let runnerOsc = null;
 let runnerGain = null;
 let runnerPanner = null;
 let runnerPulseInterval = null;
+let runnerRumbleOsc = null;
+let runnerRumbleGain = null;
 
 // --- ENERGY ALERT AUDIO (WARNING / DANGER) ---
 
@@ -347,10 +349,10 @@ function startRunnerPresence() {
 	if (!runnerOsc || !runnerGain || !audio.ctx || runnerPulseInterval) return;
 
 	const pulseOnTime = 0.10;
-	const pulseOffTime = 0.18;
+	const pulseOffTime = 0.15;
 
-	const baseGain = 0.032;
-	const maxGain = 0.085;
+	const baseGain = 0.06;
+	const maxGain = 0.1;
 
 	runnerPulseInterval = setInterval(() => {
 		const now = audio.ctx.currentTime;
