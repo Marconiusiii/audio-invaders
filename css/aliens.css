@@ -351,3 +351,18 @@ details {
 	border-radius: 6px;
 	color: var(--primary);
 }
+
+#pause-overlay {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	font-size: 2rem;
+	font-weight: bold;
+	color: #ffffff;
+	background: rgba(0, 0, 0, 0.7);
+	padding: 1rem 1.5rem;
+	border-radius: 8px;
+	z-index: 100;
+	pointer-events: none;
+}

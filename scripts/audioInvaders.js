@@ -318,6 +318,10 @@ let runnerPulseInterval = null;
 let runnerRumbleOsc = null;
 let runnerRumbleGain = null;
 
+let isPaused = false;
+let pauseOverlay = null;
+
+
 // --- ENERGY ALERT AUDIO (WARNING / DANGER) ---
 
 let alertOsc = null;
@@ -671,7 +675,7 @@ function playRunnerImpactExplosion(panVal = 0) {
 
 function attemptFire(source) {
 	if (!state.isActive) return;
-
+	if (isPaused) return;
 	const nowMs = performance.now();
 
 	// De-dupe: prevents double-fire when AT triggers click plus a key event
@@ -796,6 +800,19 @@ function destroyHud() {
 	scoreDisplay = null;
 	energyDisplay = null;
 	roundDisplay = null;
+}
+
+function cycleVerbosity() {
+	if (verbosityMode === 'original') {
+		verbosityMode = 'low';
+		announce('Verbosity low');
+	} else if (verbosityMode === 'low') {
+		verbosityMode = 'off';
+		announce('Verbosity off');
+	} else {
+		verbosityMode = 'original';
+		announce('Verbosity original');
+	}
 }
 
 function announceGameEvent(type, originalMessage, lowMessage = '') {
@@ -959,6 +976,9 @@ function maybeSpawnRunner() {
 
 function gameOver() {
 	state.isActive = false;
+	isPaused = false;
+	hidePauseOverlay();
+
 	runnerActive = false;
 	runnerRef = null;
 	stopRunnerPresence();
@@ -993,9 +1013,15 @@ function gameOver() {
 function gameLoop(timestamp) {
 	if (!state.isActive) return;
 
+	if (isPaused) {
+		// Keep time in sync so dt doesn't accumulate while paused
+		state.lastFrameTime = timestamp;
+		requestAnimationFrame(gameLoop);
+		return;
+	}
+
 	const dt = (timestamp - state.lastFrameTime) / 1000;
 	state.lastFrameTime = timestamp;
-
 	// Spawning Logic
 	state.spawnTimer -= dt;
 	if (state.spawnTimer <= 0) {
@@ -1147,6 +1173,41 @@ function gameLoop(timestamp) {
 
 let streak = 0;
 
+function showPauseOverlay() {
+	if (pauseOverlay) return;
+
+	pauseOverlay = document.createElement('div');
+	pauseOverlay.id = 'pause-overlay';
+	pauseOverlay.textContent = 'Game Paused';
+
+	gameBoard.appendChild(pauseOverlay);
+}
+
+function hidePauseOverlay() {
+	if (!pauseOverlay) return;
+
+	pauseOverlay.remove();
+	pauseOverlay = null;
+}
+
+function togglePause() {
+	if (!state.isActive) return;
+
+	isPaused = !isPaused;
+
+	if (isPaused) {
+		announce('Game Paused');
+		showPauseOverlay();
+
+		// Stop runner audio cleanly
+		if (runnerGain) runnerGain.gain.setValueAtTime(0, audio.ctx.currentTime);
+		if (runnerRumbleGain) runnerRumbleGain.gain.setValueAtTime(0, audio.ctx.currentTime);
+	} else {
+//		announce('Game Resumed');
+		hidePauseOverlay();
+	}
+}
+
 function showLaserBeam(alienY) {
 	const gameRect = gameBoard.getBoundingClientRect();
 
@@ -1196,7 +1257,7 @@ function showRunnerExplosion(x, y) {
 
 function fireCannon() {
 	if (!state.isActive) return;
-	
+	if (isPaused) return;
 	audio.playShoot();
 
 	// Hit Detection
@@ -1391,6 +1452,20 @@ window.addEventListener('keydown', (e) => {
 			announce(`Round ${state.round}`);
 			return;
 		}
+
+		if (e.key === 'p' || e.key === 'P') {
+			e.preventDefault();
+			togglePause();
+			return;
+		}
+
+		if (e.key === 'v' || e.key === 'V') {
+			e.preventDefault();
+			cycleVerbosity();
+			return;
+		}
+
+
 	}
 
 // Fire controls (keyboard only)
