@@ -333,6 +333,18 @@ function initRunnerAudio() {
 	runnerOsc = audio.ctx.createOscillator();
 	runnerGain = audio.ctx.createGain();
 	runnerPanner = audio.ctx.createStereoPanner();
+	runnerRumbleOsc = audio.ctx.createOscillator();
+	runnerRumbleGain = audio.ctx.createGain();
+
+	runnerRumbleOsc.type = 'sine';
+	runnerRumbleOsc.frequency.setValueAtTime(88, audio.ctx.currentTime);
+
+	runnerRumbleGain.gain.setValueAtTime(0, audio.ctx.currentTime);
+
+	runnerRumbleOsc.connect(runnerRumbleGain);
+	runnerRumbleGain.connect(audio.masterGain);
+
+	runnerRumbleOsc.start();
 
 	runnerOsc.type = 'sawtooth';
 	runnerGain.gain.value = 0;
@@ -349,10 +361,10 @@ function startRunnerPresence() {
 	if (!runnerOsc || !runnerGain || !audio.ctx || runnerPulseInterval) return;
 
 	const pulseOnTime = 0.10;
-	const pulseOffTime = 0.15;
+	const pulseOffTime = 0.10;
 
-	const baseGain = 0.06;
-	const maxGain = 0.1;
+	const baseGain = 0.09;
+	const maxGain = 0.18;
 
 	runnerPulseInterval = setInterval(() => {
 		const now = audio.ctx.currentTime;
@@ -1007,6 +1019,27 @@ function gameLoop(timestamp) {
 		const roundScale = 1 + (state.round * 0.018);
 		alien.x += alien.speedX * roundScale * dt;
 		alien.y += alien.speedY * roundScale * dt;
+		if (runnerRumbleGain && audio.ctx) {
+			const yRatio = Math.min(1, alien.y / GAME_HEIGHT);
+
+			if (yRatio > 0.78) {
+				const dangerZone = (yRatio - 0.78) / 0.22;
+				const rumbleGain = 0.02 + (0.08 * dangerZone);
+
+				runnerRumbleGain.gain.setTargetAtTime(
+					rumbleGain,
+					audio.ctx.currentTime,
+					0.15
+				);
+			} else {
+				runnerRumbleGain.gain.setTargetAtTime(
+					0,
+					audio.ctx.currentTime,
+					0.2
+				);
+			}
+		}
+
 	} else {
 		alien.x += alien.speedX * dt;
 		alien.y += alien.speedY * dt;
@@ -1072,6 +1105,16 @@ function gameLoop(timestamp) {
 				runnerActive = false;
 				runnerRef = null;
 				stopRunnerPresence();
+				if (runnerRumbleGain) {
+					runnerRumbleGain.gain.setValueAtTime(0, audio.ctx.currentTime);
+				}
+
+				if (runnerRumbleOsc) {
+					runnerRumbleOsc.stop();
+					runnerRumbleOsc = null;
+					runnerRumbleGain = null;
+				}
+
 				playRunnerImpactExplosion(runPanVal);
 			} else {
 				state.energy -= 20;
@@ -1215,6 +1258,16 @@ function fireCannon() {
 		runnerActive = false;
 		runnerRef = null;
 		stopRunnerPresence();
+		if (runnerRumbleGain) {
+			runnerRumbleGain.gain.setValueAtTime(0, audio.ctx.currentTime);
+		}
+
+		if (runnerRumbleOsc) {
+			runnerRumbleOsc.stop();
+			runnerRumbleOsc = null;
+			runnerRumbleGain = null;
+		}
+
 
 			const panVal = ((target.x / GAME_WIDTH) * 2) - 1;
 			playRunnerExplosion(panVal);
