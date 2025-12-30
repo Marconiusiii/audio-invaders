@@ -35,6 +35,8 @@
 		<details>
 			<summary>Dec 29 Update Log</summary>
 			<ul>
+				<li>You can now Pause the game! Toggle with the "p" key during gameplay.</li>
+				<li>You can now toggle through the screen reader verbosity options with the "v" key during gameplay. Useful if you forget to change the setting before launching the game.</li>
 				<li>Fixed a tear-down bug in the High Score flow where entering a new high score silently failed when returning to the home screen.</li>
 				<li>Made the Runner a bit slower, tweaked it's sound effect so it can be more easily tracked, but still dangerous at later levels.</li>
 				<li><strong>MacOS Safari Note: </strong>Due to a current webkit accessibility bug, VoiceOver will not read updated Energy, Score, or ROund values if you focus on the Hud during gameplay. The shortcuts will speak the correct values. This bug does not exist in iOS Safari.</li>
@@ -49,7 +51,14 @@
 			<li>Listen for Alien beeps moving Left to Right.</li>
 			<li>Click FIRE when the sound is in the CENTER.</li>
 			<li>Faster beeps = Aliens closer to the bottom!</li>
-			<li>Keyboard Support: Fire the cannon with Space Bar or Enter Key. Press "e" to hear current Energy, "s" to hear current score, and "r" to hear current round when using a screen reader.</li>
+			<li>Keyboard Shortcuts: 
+				<ul><li>Fire the cannon with Space Bar or Enter Key</li>
+				<li>Press "e" to hear current Energy.</li>
+				</li>Press "s" to hear current score.</li>
+				<li>Press "r" to hear current round.</li>
+				<li>Press "p" to pause and unpause the game.</li>
+				<li>Press "v" to toggle between the verbosity options.</li>
+				</ul></li>
 			<li>After Round 5, hitting 3 aliens in a row will give you a +15 energy boost. After round 5, max energy tops out at 175.</li>
 			<li>Runners start spawning at Round 10. They sound different from the Alien beeps, move fast, are worth 200 points and +20 Energy, but you lose 30 Energy if they hit the ground. Beware!</li>
 		</ol>
@@ -111,7 +120,7 @@
 	</nav>
 
 	<p class="footer-copy small muted">
-		&copy;2025 Chancey Fleet and Marco Salsiccia - v.1.3.2</p>
+		&copy;2025 Chancey Fleet and Marco Salsiccia - v.1.3.3</p>
 </footer>
 	<!-- Accessibility Live Region -->
 	<div id="aria-announcer" class="screen-reader-only" aria-live="assertive"></div>

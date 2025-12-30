@@ -371,6 +371,7 @@ function startRunnerPresence() {
 	const maxGain = 0.18;
 
 	runnerPulseInterval = setInterval(() => {
+		if (isPaused) return;
 		const now = audio.ctx.currentTime;
 
 		const yRatio = runnerRef ? Math.min(1, runnerRef.y / GAME_HEIGHT) : 0;
