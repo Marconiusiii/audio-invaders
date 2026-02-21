@@ -1529,9 +1529,6 @@ if (e.code === 'Space' || e.code === 'Enter') {
 //   <p id="hs-error" aria-live="polite">...</p>
 //   <button id="hs-cancel-btn" type="button">Cancel</button>
 
-// MUST MATCH the secret token in highScores.php
-const HS_TOKEN = "h4ckingIsBadMkay?!";
-
 // Path to PHP script
 const HIGH_SCORES_URL = CURRENT_API_URL;
 
@@ -1548,6 +1545,52 @@ let latestHighScores = [];
 let pendingScore = null;
 let startBtnFocusTimeoutId = null;
 let highScoreLocked = false;
+let highScoreSubmitInFlight = false;
+
+function normalizeHighScoreEntry(entry) {
+	if (!entry || typeof entry !== 'object') return null;
+
+	const rawInitials = String(entry.initials || '').trim().toUpperCase();
+	const initials = rawInitials.replace(/[^A-Z]/g, '').slice(0, 3);
+
+	const rawScore = Number(entry.score);
+	if (!Number.isFinite(rawScore)) return null;
+
+	const score = Math.max(0, Math.floor(rawScore));
+	if (!/^[A-Z]{2,3}$/.test(initials)) return null;
+
+	return {
+		initials: initials,
+		score: score
+	};
+}
+
+function normalizeHighScoreList(scores) {
+	if (!Array.isArray(scores)) return [];
+
+	return scores
+		.map(normalizeHighScoreEntry)
+		.filter(Boolean)
+		.sort((a, b) => b.score - a.score)
+		.slice(0, MAX_HIGH_SCORES);
+}
+
+function setHighScoreFormBusy(isBusy) {
+	highScoreSubmitInFlight = isBusy;
+
+	const submitBtn = hsForm ? hsForm.querySelector('button[type="submit"]') : null;
+	if (submitBtn) {
+		submitBtn.disabled = isBusy;
+	}
+
+	if (hsCancelBtn) {
+		hsCancelBtn.disabled = isBusy;
+	}
+
+	if (hsInitialsInput) {
+		hsInitialsInput.disabled = isBusy;
+	}
+}
 
 
 // Render the scores into the <ol>
@@ -1605,11 +1648,7 @@ function loadHighScoresFromServer() {
 			});
 		})
 		.then((data) => {
-			if (!Array.isArray(data)) {
-				latestHighScores = [];
-			} else {
-				latestHighScores = data.slice().sort((a, b) => b.score - a.score);
-			}
+			latestHighScores = normalizeHighScoreList(data);
 			renderHighScores(latestHighScores);
 			return latestHighScores;
 		})
@@ -1624,15 +1663,15 @@ function loadHighScoresFromServer() {
 
 // Decide if a score qualifies for the list
 function qualifiesForHighScore(score, scores) {
-	const list = (scores && scores.length ? scores : latestHighScores)
-		.slice()
-		.sort((a, b) => b.score - a.score);
+	const rawList = (scores && scores.length ? scores : latestHighScores);
+	const list = normalizeHighScoreList(rawList);
+	const candidateScore = Math.max(0, Math.floor(Number(score) || 0));
 
 	if (!list.length) return true;
 	if (list.length < MAX_HIGH_SCORES) return true;
 
 	const lowest = list[list.length - 1].score;
-	return score >= lowest;
+	return candidateScore >= lowest;
 }
 
 // Put the start overlay into "enter your initials" mode
@@ -1654,6 +1693,7 @@ function enterHighScorePrompt(score) {
 	}
 
 	hsForm.hidden = false;
+	setHighScoreFormBusy(false);
 
 	if (hsErrorEl) {
 		hsErrorEl.textContent = '';
@@ -1674,6 +1714,7 @@ function exitHighScorePrompt() {
 	if (hsForm) {
 		hsForm.hidden = true;
 	}
+	setHighScoreFormBusy(false);
 
 	const titleEl = document.getElementById('hTitle') || (startOverlay && startOverlay.querySelector('h1'));
 	if (titleEl) {
@@ -1699,6 +1740,7 @@ loadHighScoresFromServer();
 if (hsForm) {
 	hsForm.addEventListener('submit', (event) => {
 		event.preventDefault();
+		if (highScoreSubmitInFlight) return;
 
 		if (pendingScore === null) {
 			exitHighScorePrompt();
@@ -1726,37 +1768,43 @@ if (hsForm) {
 			}
 		}
 
-		const payload = {
-			initials: raw,
-			score: pendingScore,
-			token: HS_TOKEN
-		};
+			const payload = {
+				initials: raw,
+				score: pendingScore
+			};
 
 		if (!HIGH_SCORES_URL) {
+			if (hsErrorEl) {
+				hsErrorEl.textContent = 'Unable to save high score right now.';
+			}
 			announce('Unable to save high score at this time.');
 			highScoreLocked = false;
 			exitHighScorePrompt();
 			return;
 		}
 
-		fetch(HIGH_SCORES_URL, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				'Accept': 'application/json',
-				'X-API-TOKEN': HS_TOKEN
-			},
-			body: JSON.stringify(payload)
-		}).then((response) => {
-			if (!response.ok) {
-				throw new Error(`High score POST failed: ${response.status}`);
-			}
-			return response.json().catch(() => {
-				throw new Error('High score POST returned invalid JSON');
-			});
-		}).then((data) => {
-				if (Array.isArray(data)) {
-					latestHighScores = data.slice().sort((a, b) => b.score - a.score);
+		const scoreToSubmit = pendingScore;
+		payload.score = scoreToSubmit;
+		setHighScoreFormBusy(true);
+
+			fetch(HIGH_SCORES_URL, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'Accept': 'application/json'
+				},
+				body: JSON.stringify(payload)
+			}).then((response) => {
+				if (!response.ok) {
+					throw new Error(`High score POST failed: ${response.status}`);
+				}
+				return response.json().catch(() => {
+					throw new Error('High score POST returned invalid JSON');
+				});
+			}).then((data) => {
+				const normalized = normalizeHighScoreList(data);
+				if (normalized.length || Array.isArray(data)) {
+					latestHighScores = normalized;
 					renderHighScores(latestHighScores);
 					announce('High score saved.');
 				} else {
@@ -1764,10 +1812,14 @@ if (hsForm) {
 				}
 			})
 			.catch(() => {
+				if (hsErrorEl) {
+					hsErrorEl.textContent = 'Unable to save high score. Please try again.';
+				}
 				announce('Unable to save high score at this time.');
 			})
 			.finally(() => {
 				highScoreLocked = false;
+				setHighScoreFormBusy(false);
 				exitHighScorePrompt();
 			});
 	});
@@ -1775,6 +1827,7 @@ if (hsForm) {
 
 if (hsCancelBtn) {
 	hsCancelBtn.addEventListener('click', () => {
+		if (highScoreSubmitInFlight) return;
 		highScoreLocked = false;
 		exitHighScorePrompt();
 	});
@@ -1784,14 +1837,15 @@ if (hsCancelBtn) {
 if (typeof gameOver === 'function') {
 	const _originalGameOver = gameOver;
 	gameOver = function () {
+		const finalScore = state.score;
 		_originalGameOver();
 		loadHighScoresFromServer().then((scores) => {
-			if (qualifiesForHighScore(state.score, scores)) {
+			if (qualifiesForHighScore(finalScore, scores)) {
 				if (startBtnFocusTimeoutId !== null) {
 					clearTimeout(startBtnFocusTimeoutId);
 					startBtnFocusTimeoutId = null;
 				}
-				enterHighScorePrompt(state.score);
+				enterHighScorePrompt(finalScore);
 			}
 		});
 	};
