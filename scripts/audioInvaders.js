@@ -341,19 +341,25 @@ const DIFFICULTY_CONFIG = {
 		baselineRound: 1,
 		alienGroundDamage: 20,
 		runnerGroundDamage: 30,
-		runnerSpawnChance: null
+		runnerSpawnChance: null,
+		alienJitterFloor: 0,
+		alienJitterScale: 1
 	},
 	hard: {
 		baselineRound: 6,
 		alienGroundDamage: 25,
 		runnerGroundDamage: 35,
-		runnerSpawnChance: 0.08
+		runnerSpawnChance: 0.08,
+		alienJitterFloor: 0.12,
+		alienJitterScale: 1.1
 	},
 	invasion: {
 		baselineRound: 10,
 		alienGroundDamage: 30,
 		runnerGroundDamage: 40,
-		runnerSpawnChance: 0.12
+		runnerSpawnChance: 0.12,
+		alienJitterFloor: 0.22,
+		alienJitterScale: 1.25
 	}
 };
 
@@ -879,7 +885,8 @@ let state = {
 	round: 1,
 	aliens: [],
 	lastFrameTime: 0,
-	spawnTimer: 0
+	spawnTimer: 0,
+	invasionOpeningBurstPending: false
 };
 
 const GAME_WIDTH = 600;
@@ -1024,6 +1031,7 @@ function updateStats() {
 function spawnAlien() {
 	const id = Date.now() + Math.random();
 	const effectiveRound = getEffectiveRound();
+	const difficultyConfig = getDifficultyConfig();
 
 	// Spawn either far left or far right
 	const startLeft = Math.random() > 0.5;
@@ -1038,8 +1046,10 @@ function spawnAlien() {
 		ramp = Math.min((effectiveRound - 7) / 5, 1);
 	}
 
-	// jitterFactor ranges from 1.0 -> 2.0 as ramp goes 0 -> 1
-	const jitterFactor = 1 + Math.random() * ramp;
+	const jitterFloor = difficultyConfig.alienJitterFloor || 0;
+	const jitterScale = difficultyConfig.alienJitterScale || 1;
+	const jitterRange = Math.min(1, jitterFloor + (ramp * jitterScale));
+	const jitterFactor = 1 + (Math.random() * jitterRange);
 	const finalSpeedX = baseSpeedX * jitterFactor;
 
 	// Tone jitter for this alien's beep pitch: subtle early, more distinct in later rounds
@@ -1176,8 +1186,16 @@ function gameLoop(timestamp) {
 		const maxAliens = effectiveRound >= 5 ? Math.min(3, Math.floor(effectiveRound / 2)) : 1;
 
 		const normalAlienCount = state.aliens.filter(a => a.type !== 'runner').length;
+		let desiredSpawns = 1;
+		if (currentDifficulty === 'invasion' && state.invasionOpeningBurstPending && state.round === 1) {
+			desiredSpawns = 2;
+			state.invasionOpeningBurstPending = false;
+		}
 
-		if (normalAlienCount < maxAliens) {
+		const openSlots = Math.max(0, maxAliens - normalAlienCount);
+		const spawnCount = Math.min(desiredSpawns, openSlots);
+
+		for (let i = 0; i < spawnCount; i += 1) {
 			spawnAlien();
 		}
 
@@ -1538,6 +1556,7 @@ document.getElementById('start-btn').addEventListener('click', () => {
 	state.isActive = true;
 	state.lastFrameTime = performance.now();
 	state.spawnTimer = 0;
+	state.invasionOpeningBurstPending = currentDifficulty === 'invasion';
 
 	// Clear old aliens
 	state.aliens.forEach(a => a.el.remove());
