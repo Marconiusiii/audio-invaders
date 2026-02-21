@@ -1657,6 +1657,7 @@ const highScoreListEls = {
 	invasion: document.getElementById('highscore-list-invasion')
 };
 const highScorePanels = document.querySelectorAll('.hs-panel');
+const hsDialog = document.getElementById('highscore-dialog');
 const hsForm = document.getElementById('highscore-form');
 const hsInitialsInput = document.getElementById('hs-initials');
 const hsErrorEl = document.getElementById('hs-error');
@@ -1828,7 +1829,7 @@ function qualifiesForHighScore(score, scores, mode = 'normal') {
 
 // Put the start overlay into "enter your initials" mode
 function enterHighScorePrompt(score, mode) {
-	if (!hsForm) return;
+	if (!hsForm || !hsDialog) return;
 
 	pendingScore = score;
 	pendingScoreMode = normalizeMode(mode);
@@ -1845,7 +1846,13 @@ function enterHighScorePrompt(score, mode) {
 		titleEl.textContent = 'Game Over \u2013 New High Score!';
 	}
 
-	hsForm.hidden = false;
+	if (!hsDialog.open) {
+		if (typeof hsDialog.showModal === 'function') {
+			hsDialog.showModal();
+		} else {
+			hsDialog.setAttribute('open', '');
+		}
+	}
 	setHighScoreFormBusy(false);
 
 	if (hsErrorEl) {
@@ -1869,8 +1876,12 @@ function exitHighScorePrompt() {
 		pendingScoreMode = normalizeMode(selectedDifficulty);
 	}
 
-	if (hsForm) {
-		hsForm.hidden = true;
+	if (hsDialog && hsDialog.open) {
+		if (typeof hsDialog.close === 'function') {
+			hsDialog.close();
+		} else {
+			hsDialog.removeAttribute('open');
+		}
 	}
 	setHighScoreFormBusy(false);
 
@@ -1882,12 +1893,6 @@ function exitHighScorePrompt() {
 	const startBtn = document.getElementById('start-btn');
 	if (startBtn) {
 		startBtn.focus();
-	}
-	if (hsDiv) {
-			hsDiv.removeAttribute('inert');
-		}
-	if (footer) {
-			footer.removeAttribute('inert');
 	}
 }
 
@@ -2016,6 +2021,19 @@ if (hsForm) {
 if (hsCancelBtn) {
 	hsCancelBtn.addEventListener('click', () => {
 		if (highScoreSubmitInFlight) return;
+		highScoreLocked = false;
+		exitHighScorePrompt();
+	});
+}
+
+if (hsDialog) {
+	hsDialog.addEventListener('cancel', (event) => {
+		if (highScoreSubmitInFlight) {
+			event.preventDefault();
+			return;
+		}
+
+		event.preventDefault();
 		highScoreLocked = false;
 		exitHighScorePrompt();
 	});

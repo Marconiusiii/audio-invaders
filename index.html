@@ -77,33 +77,35 @@
 			<li>Runners start spawning at Round 10. They sound different from the Alien beeps, move fast, are worth 200 points and +20 Energy, but you lose 30 Energy if they hit the ground. Beware!</li>
 		</ol>
 </details>
-		<form aria-label="New High Score" id="highscore-form" hidden>
-<h3>New High Score!</h3>
-			<p id="hs-message">
-				Well done! Enter your initials to save your score.
-			</p>
-			<label for="hs-initials">Enter Your Initials:</label>
-			<input
-				id="hs-initials"
-				name="initials"
-				type="text"
-				inputmode="text"
-				pattern="[A-Za-z]{2,3}"
-				minlength="2"
-				maxlength="3"
-				required
-			>
-			<p id="hs-error" class="screen-reader-only" aria-live="polite"></p>
-			<div>
-				<button type="submit" class="btn-primary">Save Score</button>
-				<button type="button" id="hs-cancel-btn">Don't Save</button>
-			</div>
-		</form>
+		<dialog id="highscore-dialog" aria-labelledby="hs-title" aria-describedby="hs-message">
+			<form id="highscore-form">
+				<h3 id="hs-title">New High Score!</h3>
+				<p id="hs-message">
+					Well done! Enter your initials to save your score.
+				</p>
+				<label for="hs-initials">Enter Your Initials:</label>
+				<input
+					id="hs-initials"
+					name="initials"
+					type="text"
+					inputmode="text"
+					pattern="[A-Za-z]{2,3}"
+					minlength="2"
+					maxlength="3"
+					required
+				>
+				<p id="hs-error" class="screen-reader-only" aria-live="polite"></p>
+				<div>
+					<button type="submit" class="btn-primary">Save Score</button>
+					<button type="button" id="hs-cancel-btn">Don't Save</button>
+				</div>
+			</form>
+		</dialog>
 
 <details id="settings">
 <summary>Game Settings</summary>
 
-<p>Low verbosity will only  announce Round and Score updates. If set to Off, use only audio cues and the Energy, Score, and Round shortcuts to get updates.</p>
+<p>Low verbosity will only announce Round and Score updates. Use keyboard shortcuts to hear updates if set to Off.</p>
 <fieldset>
 <legend>Speech Verbosity</legend>
 
