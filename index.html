@@ -14,8 +14,23 @@
 	<div id="high-scores"
 		class="hud">
 		<h2 id="high-scores-heading">High Scores</h2>
-		<ol id="highscore-list">
-		</ol>
+			<div id="highscore-columns">
+				<details class="hs-panel" id="scores-normal" open>
+					<h3>Normal High Scores</h3>
+					<summary>Normal High Scores</summary>
+					<ol id="highscore-list-normal"></ol>
+				</details>
+				<details class="hs-panel" id="scores-hard" open>
+					<h3>Hard High Scores</h3>
+					<summary>Hard High Scores</summary>
+					<ol id="highscore-list-hard"></ol>
+				</details>
+				<details class="hs-panel" id="scores-invasion" open>
+					<h3>Invasion High Scores</h3>
+					<summary>Invasion High Scores</summary>
+					<ol id="highscore-list-invasion"></ol>
+				</details>
+			</div>
 	</div>
 
 	<div id="game-board" aria-hidden="true">
@@ -100,6 +115,18 @@
 
 <input type="radio" name="verbosity" value="off" id="verb3">
 <label for="verb3">Off</label>
+</fieldset>
+<fieldset>
+<legend>Difficulty</legend>
+
+<input type="radio" name="difficulty" value="normal" id="diff-normal" checked>
+<label for="diff-normal">Normal</label>
+
+<input type="radio" name="difficulty" value="hard" id="diff-hard">
+<label for="diff-hard">Hard</label>
+
+<input type="radio" name="difficulty" value="invasion" id="diff-invasion">
+<label for="diff-invasion">Invasion</label>
 </fieldset>
 </details>
 

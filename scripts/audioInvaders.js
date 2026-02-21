@@ -309,6 +309,8 @@ class AudioEngine {
 const audio = new AudioEngine();
 
 let verbosityMode = 'original';
+let selectedDifficulty = 'normal';
+let currentDifficulty = 'normal';
 let runnerActive = false;
 let runnerRef = null;
 let runnerOsc = null;
@@ -328,6 +330,43 @@ let alertOsc = null;
 let alertGain = null;
 let alertInterval = null;
 let energyAlertState = 'none'; // 'none' | 'warning' | 'danger'
+
+const SETTINGS_STORAGE_KEYS = {
+	verbosity: 'audioInvaders.verbosity',
+	difficulty: 'audioInvaders.difficulty'
+};
+
+const DIFFICULTY_CONFIG = {
+	normal: {
+		baselineRound: 1,
+		alienGroundDamage: 20,
+		runnerGroundDamage: 30,
+		runnerSpawnChance: null
+	},
+	hard: {
+		baselineRound: 6,
+		alienGroundDamage: 25,
+		runnerGroundDamage: 35,
+		runnerSpawnChance: 0.08
+	},
+	invasion: {
+		baselineRound: 10,
+		alienGroundDamage: 30,
+		runnerGroundDamage: 40,
+		runnerSpawnChance: 0.12
+	}
+};
+
+const SCORE_MODES = ['normal', 'hard', 'invasion'];
+
+function getDifficultyConfig(mode = currentDifficulty) {
+	return DIFFICULTY_CONFIG[mode] || DIFFICULTY_CONFIG.normal;
+}
+
+function getEffectiveRound() {
+	const baseline = getDifficultyConfig().baselineRound;
+	return Math.max(state.round, baseline);
+}
 
 //Runner Audio Setup
 
@@ -764,12 +803,73 @@ const startOverlay = document.getElementById('start-overlay');
 const hsDiv = document.getElementById('high-scores');
 const footer = document.getElementById('footer');
 const verbosityRadios = document.querySelectorAll('input[name="verbosity"]');
+const difficultyRadios = document.querySelectorAll('input[name="difficulty"]');
+
+function saveSetting(key, value) {
+	try {
+		localStorage.setItem(key, value);
+	} catch (e) {}
+}
+
+function loadSetting(key) {
+	try {
+		return localStorage.getItem(key);
+	} catch (e) {
+		return null;
+	}
+}
+
+function applyVerbositySelection(value) {
+	const next = value || 'original';
+	verbosityMode = next;
+	verbosityRadios.forEach((radio) => {
+		radio.checked = radio.value === next;
+	});
+}
+
+function applyDifficultySelection(value) {
+	const next = DIFFICULTY_CONFIG[value] ? value : 'normal';
+	selectedDifficulty = next;
+	difficultyRadios.forEach((radio) => {
+		radio.checked = radio.value === next;
+	});
+}
+
+function applySavedSettings() {
+	const savedVerbosity = loadSetting(SETTINGS_STORAGE_KEYS.verbosity);
+	const savedDifficulty = loadSetting(SETTINGS_STORAGE_KEYS.difficulty);
+
+	applyVerbositySelection(savedVerbosity || 'original');
+	applyDifficultySelection(savedDifficulty || 'normal');
+}
+
+function setDifficultyInputsDisabled(isDisabled) {
+	difficultyRadios.forEach((radio) => {
+		radio.disabled = isDisabled;
+	});
+}
 
 verbosityRadios.forEach((radio) => {
 	radio.addEventListener('change', () => {
 		verbosityMode = radio.value;
+		saveSetting(SETTINGS_STORAGE_KEYS.verbosity, verbosityMode);
 	});
 });
+
+difficultyRadios.forEach((radio) => {
+	radio.addEventListener('change', () => {
+		if (state.isActive) {
+			applyDifficultySelection(selectedDifficulty);
+			return;
+		}
+
+		selectedDifficulty = radio.value;
+		saveSetting(SETTINGS_STORAGE_KEYS.difficulty, selectedDifficulty);
+		loadAllHighScoresFromServer();
+	});
+});
+
+applySavedSettings();
 
 
 let state = {
@@ -880,6 +980,9 @@ function cycleVerbosity() {
 		verbosityMode = 'original';
 		announce('Verbosity original');
 	}
+
+	saveSetting(SETTINGS_STORAGE_KEYS.verbosity, verbosityMode);
+	applyVerbositySelection(verbosityMode);
 }
 
 function announceGameEvent(type, originalMessage, lowMessage = '') {
@@ -920,18 +1023,19 @@ function updateStats() {
 
 function spawnAlien() {
 	const id = Date.now() + Math.random();
+	const effectiveRound = getEffectiveRound();
 
 	// Spawn either far left or far right
 	const startLeft = Math.random() > 0.5;
 	
 	// Base horizontal speed (sign applied before jitter)
-	const baseSpeedX = (startLeft ? 1 : -1) * (100 + (state.round * 20));
+	const baseSpeedX = (startLeft ? 1 : -1) * (100 + (effectiveRound * 20));
 	
 	// Jitter ramp: start at round 7, complete by round 12
 	// ramp goes 0.0 (round 6 and below) -> 1.0 (round 12+)
 	let ramp = 0;
-	if (state.round >= 7) {
-		ramp = Math.min((state.round - 7) / 5, 1);
+	if (effectiveRound >= 7) {
+		ramp = Math.min((effectiveRound - 7) / 5, 1);
 	}
 
 	// jitterFactor ranges from 1.0 -> 2.0 as ramp goes 0 -> 1
@@ -941,7 +1045,7 @@ function spawnAlien() {
 	// Tone jitter for this alien's beep pitch: subtle early, more distinct in later rounds
 	const toneBaseJitter = 10;
 	const toneMaxJitter = 80;
-	const toneRamp = Math.min(Math.max((state.round - 4) / 8, 0), 1);
+	const toneRamp = Math.min(Math.max((effectiveRound - 4) / 8, 0), 1);
 	const toneJitterRange = toneBaseJitter + (toneMaxJitter - toneBaseJitter) * toneRamp;
 	const toneOffset = (Math.random() * 2 - 1) * toneJitterRange;
 
@@ -952,7 +1056,7 @@ function spawnAlien() {
 		y: 0,
 		toneOffset: toneOffset,
 		speedX: finalSpeedX,
-		speedY: 15 + (state.round * 5),
+		speedY: 15 + (effectiveRound * 5),
 		nextBeep: 0,
 		type: 'normal',
 		el: document.createElement('div')
@@ -965,14 +1069,20 @@ function spawnAlien() {
 
 function maybeSpawnRunner() {
 	if (runnerActive) return;
-	if (state.round < 10) return;
+	const effectiveRound = getEffectiveRound();
+	const difficultyConfig = getDifficultyConfig();
+	const runnerAllowedFromStart = difficultyConfig.runnerSpawnChance !== null;
+	if (!runnerAllowedFromStart && effectiveRound < 10) return;
 
-	let spawnChance = 0.05; //was 0.05
+	let spawnChance = 0.05;
+	if (difficultyConfig.runnerSpawnChance !== null) {
+		spawnChance = difficultyConfig.runnerSpawnChance;
+	}
 
-	if (state.round >= 14) {
+	if (difficultyConfig.runnerSpawnChance === null && effectiveRound >= 14) {
 		spawnChance = 0.08;
 	}
-	if (state.round >= 18) {
+	if (difficultyConfig.runnerSpawnChance === null && effectiveRound >= 18) {
 		spawnChance = 0.12;
 	}
 
@@ -987,15 +1097,15 @@ function maybeSpawnRunner() {
 	}
 
 	const startLeft = Math.random() > 0.5;
-	const baseSpeedX = (startLeft ? 1 : -1) * (140 + (state.round * 20));
+	const baseSpeedX = (startLeft ? 1 : -1) * (140 + (effectiveRound * 20));
 
 	const runner = {
 		id: Date.now() + Math.random(),
 		x: startLeft ? 0 : GAME_WIDTH,
 		y: 0,
 		toneOffset: 0,
-		speedX: baseSpeedX * (1.15 + state.round * 0.035),
-		speedY: 22 + (state.round * 4),
+		speedX: baseSpeedX * (1.15 + effectiveRound * 0.035),
+		speedY: 22 + (effectiveRound * 4),
 		nextBeep: 0,
 		type: 'runner',
 		el: document.createElement('div')
@@ -1017,6 +1127,7 @@ function gameOver() {
 	state.isActive = false;
 	isPaused = false;
 	hidePauseOverlay();
+	setDifficultyInputsDisabled(false);
 
 	clearRunnerState();
 	teardownEnergyAlertAudio();
@@ -1058,10 +1169,11 @@ function gameLoop(timestamp) {
 
 	const dt = (timestamp - state.lastFrameTime) / 1000;
 	state.lastFrameTime = timestamp;
+	const effectiveRound = getEffectiveRound();
 	// Spawning Logic
 	state.spawnTimer -= dt;
 	if (state.spawnTimer <= 0) {
-		const maxAliens = state.round >= 5 ? Math.min(3, Math.floor(state.round / 2)) : 1;
+		const maxAliens = effectiveRound >= 5 ? Math.min(3, Math.floor(effectiveRound / 2)) : 1;
 
 		const normalAlienCount = state.aliens.filter(a => a.type !== 'runner').length;
 
@@ -1079,7 +1191,7 @@ function gameLoop(timestamp) {
 		const alien = state.aliens[index];
 	// Movement
 	if (alien.type === 'runner') {
-		const roundScale = 1 + (state.round * 0.018);
+		const roundScale = 1 + (effectiveRound * 0.018);
 		alien.x += alien.speedX * roundScale * dt;
 		alien.y += alien.speedY * roundScale * dt;
 		if (runnerRumbleGain && audio.ctx) {
@@ -1145,7 +1257,7 @@ function gameLoop(timestamp) {
 
 				const baseInterval = 1000 - (alien.y / GAME_HEIGHT * 850);
 
-				const roundFactor = Math.max(0, state.round - 1);
+					const roundFactor = Math.max(0, effectiveRound - 1);
 				const densityFactor = Math.max(0, state.aliens.length - 1);
 				const difficulty = 1 + (roundFactor * 0.15) + (densityFactor * 0.1);
 
@@ -1163,11 +1275,11 @@ function gameLoop(timestamp) {
 
 				if (alien.type === 'runner') {
 					showRunnerExplosion(alien.x, alien.y);
-					state.energy -= 30;
+					state.energy -= getDifficultyConfig().runnerGroundDamage;
 					clearRunnerState();
 					playRunnerImpactExplosion();
 				} else {
-					state.energy -= 20;
+					state.energy -= getDifficultyConfig().alienGroundDamage;
 				audio.playAlienExplosion();
 				announceGameEvent('other', 'Kaboom! Energy lost.');
 			}
@@ -1335,7 +1447,7 @@ function fireCannon() {
 		return;
 	}
 
-	if (state.round >= 5) {
+	if (getEffectiveRound() >= 5) {
 		streak += 1;
 	}
 
@@ -1369,7 +1481,7 @@ function fireCannon() {
 	} else {
 		state.score += 100;
 
-		if (state.round <= 5) {
+		if (getEffectiveRound() <= 5) {
 			state.energy = Math.min(100, state.energy + 10);
 			audio.playHit();
 			announceGameEvent('score', `Hit! Score: ${state.score}`, `${state.score}`);
@@ -1407,6 +1519,8 @@ document.getElementById('start-btn').addEventListener('click', () => {
 	teardownEnergyAlertAudio();
 	initEnergyAlertAudio();
 	initRunnerAudio();
+	currentDifficulty = selectedDifficulty;
+	setDifficultyInputsDisabled(true);
 
 	document.getElementById('cannon-btn').removeAttribute('inert');
 	document.getElementById('cannon-btn').focus();
@@ -1431,7 +1545,7 @@ document.getElementById('start-btn').addEventListener('click', () => {
 
 
 	startOverlay.style.display = 'none';
-	announceGameEvent('other', "Game Started, listen for the beeps!");
+	announceGameEvent('other', `Game Started on ${currentDifficulty} mode, listen for the beeps!`);
 	createHud();
 	updateStats();
 	updateEnergyAlert();
@@ -1523,8 +1637,10 @@ if (e.code === 'Space' || e.code === 'Enter') {
 // --- Shared High Score Logic (server-based) ---
 //
 // These expect matching elements in the HTML:
-// <ol id="highscore-list">...</ol>
-// <form id="highscore-form"> with
+// <ol id="highscore-list-normal">...</ol>
+// <ol id="highscore-list-hard">...</ol>
+// <ol id="highscore-list-invasion">...</ol>
+// plus <form id="highscore-form"> with
 //   <input id="hs-initials">
 //   <p id="hs-error" aria-live="polite">...</p>
 //   <button id="hs-cancel-btn" type="button">Cancel</button>
@@ -1535,17 +1651,34 @@ const HIGH_SCORES_URL = CURRENT_API_URL;
 
 const MAX_HIGH_SCORES = 10;
 
-const highScoreListEl = document.getElementById('highscore-list');
+const highScoreListEls = {
+	normal: document.getElementById('highscore-list-normal'),
+	hard: document.getElementById('highscore-list-hard'),
+	invasion: document.getElementById('highscore-list-invasion')
+};
+const highScorePanels = document.querySelectorAll('.hs-panel');
 const hsForm = document.getElementById('highscore-form');
 const hsInitialsInput = document.getElementById('hs-initials');
 const hsErrorEl = document.getElementById('hs-error');
 const hsCancelBtn = document.getElementById('hs-cancel-btn');
+const hsMessage = document.getElementById('hs-message');
 
-let latestHighScores = [];
+let latestHighScores = {
+	normal: [],
+	hard: [],
+	invasion: []
+};
 let pendingScore = null;
+let pendingScoreMode = 'normal';
 let startBtnFocusTimeoutId = null;
 let highScoreLocked = false;
 let highScoreSubmitInFlight = false;
+
+function normalizeMode(rawMode) {
+	const mode = String(rawMode || '').trim().toLowerCase();
+	if (mode === 'hard' || mode === 'invasion') return mode;
+	return 'normal';
+}
 
 function normalizeHighScoreEntry(entry) {
 	if (!entry || typeof entry !== 'object') return null;
@@ -1594,15 +1727,17 @@ function setHighScoreFormBusy(isBusy) {
 
 
 // Render the scores into the <ol>
-function renderHighScores(scores) {
-	if (!highScoreListEl) return;
+function renderHighScores(mode, scores) {
+	const normalizedMode = normalizeMode(mode);
+	const targetList = highScoreListEls[normalizedMode];
+	if (!targetList) return;
 
-	highScoreListEl.innerHTML = '';
+	targetList.innerHTML = '';
 
 	if (!scores || !scores.length) {
 		const li = document.createElement('li');
 		li.textContent = 'No high scores yet.';
-		highScoreListEl.appendChild(li);
+		targetList.appendChild(li);
 		return;
 	}
 
@@ -1624,16 +1759,25 @@ function renderHighScores(scores) {
 		wrapper.appendChild(scoreSpan);
 
 		li.appendChild(wrapper);
-		highScoreListEl.appendChild(li);
+		targetList.appendChild(li);
 	});
 }
 
 
 // Fetch scores from server and update list
-function loadHighScoresFromServer() {
+function buildHighScoreUrl(mode) {
+	const normalizedMode = normalizeMode(mode);
+	if (!HIGH_SCORES_URL) return '';
+	return `${HIGH_SCORES_URL}?mode=${encodeURIComponent(normalizedMode)}`;
+}
+
+function loadHighScoresFromServer(mode = 'normal') {
+	const normalizedMode = normalizeMode(mode);
+	const requestUrl = buildHighScoreUrl(normalizedMode);
+
 	if (!HIGH_SCORES_URL) return Promise.resolve([]);
 
-	return fetch(HIGH_SCORES_URL, {
+	return fetch(requestUrl, {
 		method: 'GET',
 		headers: {
 			'Accept': 'application/json'
@@ -1648,22 +1792,30 @@ function loadHighScoresFromServer() {
 			});
 		})
 		.then((data) => {
-			latestHighScores = normalizeHighScoreList(data);
-			renderHighScores(latestHighScores);
-			return latestHighScores;
+			const normalized = normalizeHighScoreList(data);
+			latestHighScores[normalizedMode] = normalized;
+			renderHighScores(normalizedMode, normalized);
+			return normalized;
 		})
 		.catch(() => {
 			// If we can't reach the server, keep whatever is currently shown
-			if (!latestHighScores.length) {
-				renderHighScores([]);
+			const currentList = latestHighScores[normalizedMode] || [];
+			if (!currentList.length) {
+				renderHighScores(normalizedMode, []);
 			}
-			return latestHighScores;
+			return currentList;
 		});
 }
 
+function loadAllHighScoresFromServer() {
+	return Promise.all(SCORE_MODES.map((mode) => loadHighScoresFromServer(mode)));
+}
+
 // Decide if a score qualifies for the list
-function qualifiesForHighScore(score, scores) {
-	const rawList = (scores && scores.length ? scores : latestHighScores);
+function qualifiesForHighScore(score, scores, mode = 'normal') {
+	const normalizedMode = normalizeMode(mode);
+	const existing = latestHighScores[normalizedMode] || [];
+	const rawList = (scores && scores.length ? scores : existing);
 	const list = normalizeHighScoreList(rawList);
 	const candidateScore = Math.max(0, Math.floor(Number(score) || 0));
 
@@ -1675,10 +1827,11 @@ function qualifiesForHighScore(score, scores) {
 }
 
 // Put the start overlay into "enter your initials" mode
-function enterHighScorePrompt(score) {
+function enterHighScorePrompt(score, mode) {
 	if (!hsForm) return;
 
 	pendingScore = score;
+	pendingScoreMode = normalizeMode(mode);
 	highScoreLocked = true;
 
 	// Ensure overlay is visible
@@ -1698,6 +1851,10 @@ function enterHighScorePrompt(score) {
 	if (hsErrorEl) {
 		hsErrorEl.textContent = '';
 	}
+	if (hsMessage) {
+		const prettyMode = pendingScoreMode.charAt(0).toUpperCase() + pendingScoreMode.slice(1);
+		hsMessage.textContent = `Well done! Enter your initials to save your ${prettyMode} score.`;
+	}
 
 	if (hsInitialsInput) {
 		hsInitialsInput.value = '';
@@ -1709,6 +1866,7 @@ function enterHighScorePrompt(score) {
 function exitHighScorePrompt() {
 	if (!highScoreLocked) {
 		pendingScore = null;
+		pendingScoreMode = normalizeMode(selectedDifficulty);
 	}
 
 	if (hsForm) {
@@ -1734,7 +1892,35 @@ function exitHighScorePrompt() {
 }
 
 // Initial load of scores when script runs
-loadHighScoresFromServer();
+function applyMobileHighScoreAccordionBehavior() {
+	const isMobile = window.matchMedia('(max-width: 768px)').matches;
+	if (!isMobile) return;
+
+	highScorePanels.forEach((panel) => {
+		if (!panel.open) return;
+		highScorePanels.forEach((otherPanel) => {
+			if (otherPanel !== panel) {
+				otherPanel.open = false;
+			}
+		});
+	});
+}
+
+function initHighScorePanels() {
+	highScorePanels.forEach((panel) => {
+		panel.addEventListener('toggle', () => {
+			applyMobileHighScoreAccordionBehavior();
+		});
+	});
+
+	window.addEventListener('resize', () => {
+		applyMobileHighScoreAccordionBehavior();
+	});
+}
+
+initHighScorePanels();
+applyMobileHighScoreAccordionBehavior();
+loadAllHighScoresFromServer();
 
 // Wire up the high score form submit / cancel
 if (hsForm) {
@@ -1770,7 +1956,8 @@ if (hsForm) {
 
 			const payload = {
 				initials: raw,
-				score: pendingScore
+				score: pendingScore,
+				mode: pendingScoreMode
 			};
 
 		if (!HIGH_SCORES_URL) {
@@ -1785,6 +1972,7 @@ if (hsForm) {
 
 		const scoreToSubmit = pendingScore;
 		payload.score = scoreToSubmit;
+		payload.mode = pendingScoreMode;
 		setHighScoreFormBusy(true);
 
 			fetch(HIGH_SCORES_URL, {
@@ -1804,8 +1992,8 @@ if (hsForm) {
 			}).then((data) => {
 				const normalized = normalizeHighScoreList(data);
 				if (normalized.length || Array.isArray(data)) {
-					latestHighScores = normalized;
-					renderHighScores(latestHighScores);
+					latestHighScores[pendingScoreMode] = normalized;
+					renderHighScores(pendingScoreMode, normalized);
 					announce('High score saved.');
 				} else {
 					throw new Error('High score POST response was not an array');
@@ -1838,14 +2026,15 @@ if (typeof gameOver === 'function') {
 	const _originalGameOver = gameOver;
 	gameOver = function () {
 		const finalScore = state.score;
+		const finalMode = currentDifficulty;
 		_originalGameOver();
-		loadHighScoresFromServer().then((scores) => {
-			if (qualifiesForHighScore(finalScore, scores)) {
+		loadHighScoresFromServer(finalMode).then((scores) => {
+			if (qualifiesForHighScore(finalScore, scores, finalMode)) {
 				if (startBtnFocusTimeoutId !== null) {
 					clearTimeout(startBtnFocusTimeoutId);
 					startBtnFocusTimeoutId = null;
 				}
-				enterHighScorePrompt(finalScore);
+				enterHighScorePrompt(finalScore, finalMode);
 			}
 		});
 	};
