@@ -587,7 +587,7 @@ function playRunnerExplosion() {
 	noiseSource.stop(now + 0.6);
 }
 
-function playRunnerImpactExplosion(panVal = 0) {
+function playRunnerImpactExplosion() {
 	if (!audio.ctx) return;
 
 	const now = audio.ctx.currentTime + 0.02;
@@ -674,7 +674,7 @@ function playRunnerImpactExplosion(panVal = 0) {
 	sparkSource.stop(now + 0.6);
 }
 
-function attemptFire(source) {
+function attemptFire() {
 	if (!state.isActive) return;
 	if (isPaused) return;
 	const nowMs = performance.now();
@@ -838,42 +838,6 @@ function announceGameEvent(type, originalMessage, lowMessage = '') {
 
 function announce(text) {
 	ariaAnnouncer.textContent = text;
-}
-
-function replaceHudValue(el, value) {
-	if (!el) return;
-
-	const nextValue = String(value);
-
-	// If value didn't change, do nothing (keeps DOM calmer).
-	if (el.textContent === nextValue) return;
-
-
-	const replacement = el.cloneNode(false);
-	replacement.textContent = nextValue;
-
-	// Preserve id (cloneNode(false) keeps attributes, but be explicit).
-	replacement.id = el.id;
-
-	el.replaceWith(replacement);
-
-	// Update our references so future updates hit the current node.
-	if (replacement.id === 'score-display') {
-		scoreDisplay = replacement;
-	} else if (replacement.id === 'energy-display') {
-		energyDisplay = replacement;
-	} else if (replacement.id === 'round-display') {
-		roundDisplay = replacement;
-	}
-}
-
-let lastHudAnnounceTime = 0;
-
-function isMacOSSafari() {
-	const ua = navigator.userAgent;
-	const isSafari = ua.includes('Safari') && !ua.includes('Chrome') && !ua.includes('Chromium');
-	const isMac = ua.includes('Macintosh');
-	return isSafari && isMac;
 }
 
 function updateStats() {
@@ -1126,7 +1090,6 @@ function gameLoop(timestamp) {
 			alien.el.remove();
 
 			if (alien.type === 'runner') {
-				const runPanVal = ((alien.x / GAME_WIDTH) * 2) - 1;
 				showRunnerExplosion(alien.x, alien.y);
 				state.energy -= 30;
 				runnerActive = false;
@@ -1142,7 +1105,7 @@ function gameLoop(timestamp) {
 					runnerRumbleGain = null;
 				}
 
-				playRunnerImpactExplosion(runPanVal);
+				playRunnerImpactExplosion();
 			} else {
 				state.energy -= 20;
 				audio.playAlienExplosion();
@@ -1409,7 +1372,7 @@ document.getElementById('start-btn').addEventListener('click', () => {
 
 cannonBtn.addEventListener('click', (e) => {
 	e.preventDefault();
-	attemptFire('click');
+	attemptFire();
 });
 
 cannonBtn.addEventListener('pointerdown', () => {
@@ -1479,7 +1442,7 @@ if (e.code === 'Space' || e.code === 'Enter') {
 	}
 
 	e.preventDefault();
-	attemptFire('key');
+	attemptFire();
 
 
 	// Visual press effect
@@ -1687,21 +1650,21 @@ if (hsForm) {
 			}
 		}
 
-const payload = {
-	initials: raw,
-	score: pendingScore,
-	token: HS_TOKEN
-};
+		const payload = {
+			initials: raw,
+			score: pendingScore,
+			token: HS_TOKEN
+		};
 
 		fetch(HIGH_SCORES_URL, {
-	method: 'POST',
-	headers: {
-		'Content-Type': 'application/json',
-		'Accept': 'application/json',
-		'X-API-TOKEN': HS_TOKEN
-	},
-	body: JSON.stringify(payload)
-}).then((response) => response.json()).then((data) => {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'Accept': 'application/json',
+				'X-API-TOKEN': HS_TOKEN
+			},
+			body: JSON.stringify(payload)
+		}).then((response) => response.json()).then((data) => {
 				if (Array.isArray(data)) {
 					latestHighScores = data.slice().sort((a, b) => b.score - a.score);
 					renderHighScores(latestHighScores);
@@ -1742,11 +1705,10 @@ if (typeof gameOver === 'function') {
 	};
 }
 
-function footerYear() {
+function setFooterYear() {
 	const yearEl = document.getElementById('copyrightYear');
-	if (yearEl) {
-		yearEl.textContent = new Date().getFullYear();
-	}
+	if (!yearEl) return;
+	yearEl.textContent = new Date().getFullYear();
 }
 
-footerYear();
+setFooterYear();
