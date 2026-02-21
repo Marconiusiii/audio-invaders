@@ -343,7 +343,8 @@ const DIFFICULTY_CONFIG = {
 		runnerGroundDamage: 30,
 		runnerSpawnChance: null,
 		alienJitterFloor: 0,
-		alienJitterScale: 1
+		alienJitterScale: 1,
+		missPenalty: 5
 	},
 	hard: {
 		baselineRound: 6,
@@ -351,7 +352,8 @@ const DIFFICULTY_CONFIG = {
 		runnerGroundDamage: 35,
 		runnerSpawnChance: 0.08,
 		alienJitterFloor: 0.12,
-		alienJitterScale: 1.1
+		alienJitterScale: 1.1,
+		missPenalty: 8
 	},
 	invasion: {
 		baselineRound: 10,
@@ -359,7 +361,8 @@ const DIFFICULTY_CONFIG = {
 		runnerGroundDamage: 40,
 		runnerSpawnChance: 0.12,
 		alienJitterFloor: 0.22,
-		alienJitterScale: 1.25
+		alienJitterScale: 1.25,
+		missPenalty: 12
 	}
 };
 
@@ -1415,6 +1418,7 @@ function showRunnerExplosion(x, y) {
 function fireCannon() {
 	if (!state.isActive) return;
 	if (isPaused) return;
+	const missPenalty = getDifficultyConfig().missPenalty || 5;
 	audio.playShoot();
 
 	// Hit Detection
@@ -1430,7 +1434,7 @@ function fireCannon() {
 
 	if (targets.length === 0) {
 		// Miss
-		state.energy -= 5;
+		state.energy -= missPenalty;
 		streak = 0;
 		audio.playMiss();
 		announceGameEvent('other', 'Miss!');
@@ -1450,7 +1454,7 @@ function fireCannon() {
 	const target = targets[0];
 	const hitIndex = state.aliens.indexOf(target);
 	if (hitIndex < 0 || !target.el || !target.el.isConnected) {
-		state.energy -= 5;
+		state.energy -= missPenalty;
 		streak = 0;
 		audio.playMiss();
 		announceGameEvent('other', 'Miss!');
