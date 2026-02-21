@@ -257,8 +257,29 @@ h1 {
 	z-index: 30; /* above aliens and beam */
 }
 
+@keyframes laserFade {
+	0% {
+		opacity: 1;
+	}
+	100% {
+		opacity: 0;
+	}
+}
+
+@keyframes explodeAnim {
+	0% {
+		transform: translate(-50%, -50%) scale(0.5);
+		opacity: 1;
+	}
+	100% {
+		transform: translate(-50%, -50%) scale(1.6);
+		opacity: 0;
+	}
+}
+
 #settings {
-	margin-top: 1.5rem;	border-radius: 6px;
+	margin-top: 1.5rem;
+	border-radius: 6px;
 	color: #fff;
 }
 
