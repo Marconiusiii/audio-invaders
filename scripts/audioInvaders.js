@@ -344,7 +344,9 @@ const DIFFICULTY_CONFIG = {
 		runnerSpawnChance: null,
 		alienJitterFloor: 0,
 		alienJitterScale: 1,
-		missPenalty: 5
+		missPenalty: 5,
+		patternChance: 0,
+		patternCooldownMs: 0
 	},
 	hard: {
 		baselineRound: 6,
@@ -353,7 +355,9 @@ const DIFFICULTY_CONFIG = {
 		runnerSpawnChance: 0.08,
 		alienJitterFloor: 0.12,
 		alienJitterScale: 1.1,
-		missPenalty: 8
+		missPenalty: 8,
+		patternChance: 0.18,
+		patternCooldownMs: 7000
 	},
 	invasion: {
 		baselineRound: 10,
@@ -362,7 +366,9 @@ const DIFFICULTY_CONFIG = {
 		runnerSpawnChance: 0.12,
 		alienJitterFloor: 0.22,
 		alienJitterScale: 1.25,
-		missPenalty: 12
+		missPenalty: 12,
+		patternChance: 0.33,
+		patternCooldownMs: 4500
 	}
 };
 
@@ -641,6 +647,7 @@ let roundDisplay = null;
 
 
 const ariaAnnouncer = document.getElementById('aria-announcer');
+let announceTimeoutId = null;
 
 
 
@@ -889,7 +896,9 @@ let state = {
 	aliens: [],
 	lastFrameTime: 0,
 	spawnTimer: 0,
-	invasionOpeningBurstPending: false
+	invasionOpeningBurstPending: false,
+	lastPatternTimeMs: 0,
+	delayedPatternSpawnId: null
 };
 
 const GAME_WIDTH = 600;
@@ -1016,7 +1025,20 @@ function announceGameEvent(type, originalMessage, lowMessage = '') {
 
 
 function announce(text) {
-	ariaAnnouncer.textContent = text;
+	if (!ariaAnnouncer) return;
+	const message = String(text || '').trim();
+	if (!message) return;
+
+	if (announceTimeoutId !== null) {
+		clearTimeout(announceTimeoutId);
+		announceTimeoutId = null;
+	}
+
+	ariaAnnouncer.textContent = '';
+	announceTimeoutId = setTimeout(() => {
+		ariaAnnouncer.textContent = message;
+		announceTimeoutId = null;
+	}, 30);
 }
 
 function updateStats() {
@@ -1031,13 +1053,15 @@ function updateStats() {
 	}
 }
 
-function spawnAlien() {
+function spawnAlien(options = {}) {
 	const id = Date.now() + Math.random();
 	const effectiveRound = getEffectiveRound();
 	const difficultyConfig = getDifficultyConfig();
+	const forcedStartLeft = typeof options.startLeft === 'boolean' ? options.startLeft : null;
+	const speedMultiplier = Number.isFinite(options.speedMultiplier) ? Math.max(0.5, options.speedMultiplier) : 1;
 
 	// Spawn either far left or far right
-	const startLeft = Math.random() > 0.5;
+	const startLeft = forcedStartLeft === null ? Math.random() > 0.5 : forcedStartLeft;
 	
 	// Base horizontal speed (sign applied before jitter)
 	const baseSpeedX = (startLeft ? 1 : -1) * (100 + (effectiveRound * 20));
@@ -1053,7 +1077,7 @@ function spawnAlien() {
 	const jitterScale = difficultyConfig.alienJitterScale || 1;
 	const jitterRange = Math.min(1, jitterFloor + (ramp * jitterScale));
 	const jitterFactor = 1 + (Math.random() * jitterRange);
-	const finalSpeedX = baseSpeedX * jitterFactor;
+	const finalSpeedX = baseSpeedX * jitterFactor * speedMultiplier;
 
 	// Tone jitter for this alien's beep pitch: subtle early, more distinct in later rounds
 	const toneBaseJitter = 10;
@@ -1078,6 +1102,70 @@ function spawnAlien() {
 	alien.el.className = 'alien';
 	gameBoard.appendChild(alien.el);
 	state.aliens.push(alien);
+}
+
+function getMaxNormalAliensForCurrentDifficulty() {
+	const effectiveRound = getEffectiveRound();
+	return effectiveRound >= 5 ? Math.min(3, Math.floor(effectiveRound / 2)) : 1;
+}
+
+function getNormalAlienCount() {
+	return state.aliens.filter((alien) => alien.type !== 'runner').length;
+}
+
+function clearDelayedPatternSpawn() {
+	if (state.delayedPatternSpawnId !== null) {
+		clearTimeout(state.delayedPatternSpawnId);
+		state.delayedPatternSpawnId = null;
+	}
+}
+
+function scheduleStaggerFollowUp(firstStartLeft) {
+	clearDelayedPatternSpawn();
+	const delayMs = 220 + Math.floor(Math.random() * 220);
+	state.delayedPatternSpawnId = setTimeout(() => {
+		state.delayedPatternSpawnId = null;
+		if (!state.isActive || isPaused) return;
+
+		const maxAliens = getMaxNormalAliensForCurrentDifficulty();
+		const currentNormalCount = getNormalAlienCount();
+		if (currentNormalCount >= maxAliens) return;
+
+		spawnAlien({
+			startLeft: !firstStartLeft,
+			speedMultiplier: 1.08
+		});
+	}, delayMs);
+}
+
+function maybeSpawnPattern(openSlots) {
+	const difficultyConfig = getDifficultyConfig();
+	const patternChance = difficultyConfig.patternChance || 0;
+	const patternCooldownMs = difficultyConfig.patternCooldownMs || 0;
+
+	if (patternChance <= 0 || openSlots <= 0) return 0;
+
+	const nowMs = performance.now();
+	if ((nowMs - state.lastPatternTimeMs) < patternCooldownMs) return 0;
+	if (Math.random() > patternChance) return 0;
+
+	const patternPool = openSlots >= 2 ? ['pincer', 'stagger'] : ['stagger'];
+	const selectedPattern = patternPool[Math.floor(Math.random() * patternPool.length)];
+
+	if (selectedPattern === 'pincer' && openSlots >= 2) {
+		const speedBoost = currentDifficulty === 'invasion' ? 1.12 : 1.06;
+		spawnAlien({ startLeft: true, speedMultiplier: speedBoost });
+		spawnAlien({ startLeft: false, speedMultiplier: speedBoost });
+		state.lastPatternTimeMs = nowMs;
+		return 2;
+	}
+
+	const firstStartLeft = Math.random() > 0.5;
+	const firstSpeedBoost = currentDifficulty === 'invasion' ? 1.14 : 1.08;
+	spawnAlien({ startLeft: firstStartLeft, speedMultiplier: firstSpeedBoost });
+	scheduleStaggerFollowUp(firstStartLeft);
+	state.lastPatternTimeMs = nowMs;
+	return 1;
 }
 
 function maybeSpawnRunner() {
@@ -1143,6 +1231,7 @@ function gameOver() {
 	setDifficultyInputsDisabled(false);
 
 	clearRunnerState();
+	clearDelayedPatternSpawn();
 	teardownEnergyAlertAudio();
 	audio.playBell(); // Ring bell at zero/end
 	announce(`Game over, man, game over! Final Score ${state.score}.`);
@@ -1186,20 +1275,34 @@ function gameLoop(timestamp) {
 	// Spawning Logic
 	state.spawnTimer -= dt;
 	if (state.spawnTimer <= 0) {
-		const maxAliens = effectiveRound >= 5 ? Math.min(3, Math.floor(effectiveRound / 2)) : 1;
+		const maxAliens = getMaxNormalAliensForCurrentDifficulty();
 
-		const normalAlienCount = state.aliens.filter(a => a.type !== 'runner').length;
+		const normalAlienCount = getNormalAlienCount();
 		let desiredSpawns = 1;
+		let openingBurstActive = false;
 		if (currentDifficulty === 'invasion' && state.invasionOpeningBurstPending && state.round === 1) {
 			desiredSpawns = 2;
 			state.invasionOpeningBurstPending = false;
+			openingBurstActive = true;
 		}
 
 		const openSlots = Math.max(0, maxAliens - normalAlienCount);
-		const spawnCount = Math.min(desiredSpawns, openSlots);
+		let spawnCount = 0;
+		let usedPatternSpawn = false;
 
-		for (let i = 0; i < spawnCount; i += 1) {
-			spawnAlien();
+		if (!openingBurstActive) {
+			spawnCount = maybeSpawnPattern(openSlots);
+			usedPatternSpawn = spawnCount > 0;
+		}
+
+		if (spawnCount === 0) {
+			spawnCount = Math.min(desiredSpawns, openSlots);
+		}
+
+		if (!usedPatternSpawn) {
+			for (let i = 0; i < spawnCount; i += 1) {
+				spawnAlien();
+			}
 		}
 
 		maybeSpawnRunner();
@@ -1561,6 +1664,8 @@ document.getElementById('start-btn').addEventListener('click', () => {
 	state.lastFrameTime = performance.now();
 	state.spawnTimer = 0;
 	state.invasionOpeningBurstPending = currentDifficulty === 'invasion';
+	state.lastPatternTimeMs = 0;
+	clearDelayedPatternSpawn();
 
 	// Clear old aliens
 	state.aliens.forEach(a => a.el.remove());
@@ -1998,10 +2103,11 @@ if (hsForm) {
 			return;
 		}
 
-		const scoreToSubmit = pendingScore;
-		payload.score = scoreToSubmit;
-		payload.mode = pendingScoreMode;
-		setHighScoreFormBusy(true);
+			const scoreToSubmit = pendingScore;
+			payload.score = scoreToSubmit;
+			payload.mode = pendingScoreMode;
+			setHighScoreFormBusy(true);
+			let closeDelayMs = 0;
 
 			fetch(HIGH_SCORES_URL, {
 				method: 'POST',
@@ -2017,15 +2123,16 @@ if (hsForm) {
 				return response.json().catch(() => {
 					throw new Error('High score POST returned invalid JSON');
 				});
-			}).then((data) => {
-				const normalized = normalizeHighScoreList(data);
-				if (normalized.length || Array.isArray(data)) {
-					latestHighScores[pendingScoreMode] = normalized;
-					renderHighScores(pendingScoreMode, normalized);
-					announce('High score saved.');
-				} else {
-					throw new Error('High score POST response was not an array');
-				}
+				}).then((data) => {
+					const normalized = normalizeHighScoreList(data);
+					if (normalized.length || Array.isArray(data)) {
+						latestHighScores[pendingScoreMode] = normalized;
+						renderHighScores(pendingScoreMode, normalized);
+						announce('High score saved.');
+						closeDelayMs = 180;
+					} else {
+						throw new Error('High score POST response was not an array');
+					}
 			})
 			.catch(() => {
 				if (hsErrorEl) {
@@ -2033,11 +2140,17 @@ if (hsForm) {
 				}
 				announce('Unable to save high score at this time.');
 			})
-			.finally(() => {
-				highScoreLocked = false;
-				setHighScoreFormBusy(false);
-				exitHighScorePrompt();
-			});
+				.finally(() => {
+					highScoreLocked = false;
+					setHighScoreFormBusy(false);
+					if (closeDelayMs > 0) {
+						setTimeout(() => {
+							exitHighScorePrompt();
+						}, closeDelayMs);
+						return;
+					}
+					exitHighScorePrompt();
+				});
 	});
 }
 
