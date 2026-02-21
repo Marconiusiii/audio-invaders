@@ -333,6 +333,7 @@ let energyAlertState = 'none'; // 'none' | 'warning' | 'danger'
 
 function initRunnerAudio() {
 	if (!audio.ctx) return;
+	teardownRunnerAudio();
 
 	runnerOsc = audio.ctx.createOscillator();
 	runnerGain = audio.ctx.createGain();
@@ -401,9 +402,59 @@ function stopRunnerPresence() {
 	if (runnerPanner) runnerPanner.pan.setValueAtTime(0, now);
 }
 
+function teardownRunnerAudio() {
+	stopRunnerPresence();
+
+	if (runnerGain && audio.ctx) {
+		const now = audio.ctx.currentTime;
+		runnerGain.gain.cancelScheduledValues(now);
+		runnerGain.gain.setValueAtTime(0, now);
+	}
+
+	if (runnerRumbleGain && audio.ctx) {
+		const now = audio.ctx.currentTime;
+		runnerRumbleGain.gain.cancelScheduledValues(now);
+		runnerRumbleGain.gain.setValueAtTime(0, now);
+	}
+
+	if (runnerOsc) {
+		try { runnerOsc.stop(); } catch (e) {}
+		try { runnerOsc.disconnect(); } catch (e) {}
+		runnerOsc = null;
+	}
+
+	if (runnerRumbleOsc) {
+		try { runnerRumbleOsc.stop(); } catch (e) {}
+		try { runnerRumbleOsc.disconnect(); } catch (e) {}
+		runnerRumbleOsc = null;
+	}
+
+	if (runnerGain) {
+		try { runnerGain.disconnect(); } catch (e) {}
+		runnerGain = null;
+	}
+
+	if (runnerPanner) {
+		try { runnerPanner.disconnect(); } catch (e) {}
+		runnerPanner = null;
+	}
+
+	if (runnerRumbleGain) {
+		try { runnerRumbleGain.disconnect(); } catch (e) {}
+		runnerRumbleGain = null;
+	}
+}
+
+function clearRunnerState() {
+	runnerActive = false;
+	runnerRef = null;
+	teardownRunnerAudio();
+}
+
 
 function initEnergyAlertAudio() {
 	if (!audio.ctx) return;
+	teardownEnergyAlertAudio();
 
 	alertOsc = audio.ctx.createOscillator();
 	alertGain = audio.ctx.createGain();
@@ -437,6 +488,21 @@ function stopEnergyAlert() {
 	}
 
 	energyAlertState = 'none';
+}
+
+function teardownEnergyAlertAudio() {
+	stopEnergyAlert();
+
+	if (alertOsc) {
+		try { alertOsc.stop(); } catch (e) {}
+		try { alertOsc.disconnect(); } catch (e) {}
+		alertOsc = null;
+	}
+
+	if (alertGain) {
+		try { alertGain.disconnect(); } catch (e) {}
+		alertGain = null;
+	}
 }
 
 function startWarningTone() {
@@ -912,6 +978,14 @@ function maybeSpawnRunner() {
 
 	if (Math.random() > spawnChance) return;
 
+	if (!runnerOsc || !runnerGain || !runnerPanner || !runnerRumbleOsc || !runnerRumbleGain) {
+		initRunnerAudio();
+	}
+
+	if (!runnerOsc || !runnerGain || !runnerPanner || !runnerRumbleOsc || !runnerRumbleGain) {
+		return;
+	}
+
 	const startLeft = Math.random() > 0.5;
 	const baseSpeedX = (startLeft ? 1 : -1) * (140 + (state.round * 20));
 
@@ -944,11 +1018,8 @@ function gameOver() {
 	isPaused = false;
 	hidePauseOverlay();
 
-	runnerActive = false;
-	runnerRef = null;
-	stopRunnerPresence();
-
-	stopEnergyAlert();
+	clearRunnerState();
+	teardownEnergyAlertAudio();
 	audio.playBell(); // Ring bell at zero/end
 	announce(`Game over, man, game over! Final Score ${state.score}.`);
 
@@ -1003,8 +1074,9 @@ function gameLoop(timestamp) {
 		state.spawnTimer = 2.0;
 	}
 
-	// Update Aliens
-	state.aliens.forEach((alien, index) => {
+	// Update Aliens (reverse loop so removals are safe and deterministic)
+	for (let index = state.aliens.length - 1; index >= 0; index -= 1) {
+		const alien = state.aliens[index];
 	// Movement
 	if (alien.type === 'runner') {
 		const roundScale = 1 + (state.round * 0.018);
@@ -1085,40 +1157,31 @@ function gameLoop(timestamp) {
 		}
 
 		// Fail Condition (Reaches Bottom)
-		if (alien.y >= GAME_HEIGHT) {
-			state.aliens.splice(index, 1);
-			alien.el.remove();
+			if (alien.y >= GAME_HEIGHT) {
+				state.aliens.splice(index, 1);
+				alien.el.remove();
 
-			if (alien.type === 'runner') {
-				showRunnerExplosion(alien.x, alien.y);
-				state.energy -= 30;
-				runnerActive = false;
-				runnerRef = null;
-				stopRunnerPresence();
-				if (runnerRumbleGain) {
-					runnerRumbleGain.gain.setValueAtTime(0, audio.ctx.currentTime);
-				}
-
-				if (runnerRumbleOsc) {
-					runnerRumbleOsc.stop();
-					runnerRumbleOsc = null;
-					runnerRumbleGain = null;
-				}
-
-				playRunnerImpactExplosion();
-			} else {
-				state.energy -= 20;
+				if (alien.type === 'runner') {
+					showRunnerExplosion(alien.x, alien.y);
+					state.energy -= 30;
+					clearRunnerState();
+					playRunnerImpactExplosion();
+				} else {
+					state.energy -= 20;
 				audio.playAlienExplosion();
 				announceGameEvent('other', 'Kaboom! Energy lost.');
 			}
 
-			updateStats();
-			updateEnergyAlert();
+				updateStats();
+				updateEnergyAlert();
 
-			if (state.energy <= 0) gameOver();
-		}
+				if (state.energy <= 0) {
+					gameOver();
+					return;
+				}
+			}
 
-	});
+	}
 
 	// Round Progression (Simple time based or score based)
 	// Let's increase difficulty every 500 points
@@ -1164,8 +1227,8 @@ function togglePause() {
 		showPauseOverlay();
 
 		// Stop runner audio cleanly
-		if (runnerGain) runnerGain.gain.setValueAtTime(0, audio.ctx.currentTime);
-		if (runnerRumbleGain) runnerRumbleGain.gain.setValueAtTime(0, audio.ctx.currentTime);
+		if (runnerGain && audio.ctx) runnerGain.gain.setValueAtTime(0, audio.ctx.currentTime);
+		if (runnerRumbleGain && audio.ctx) runnerRumbleGain.gain.setValueAtTime(0, audio.ctx.currentTime);
 	} else {
 //		announce('Game Resumed');
 		hidePauseOverlay();
@@ -1256,6 +1319,21 @@ function fireCannon() {
 	targets.sort((a, b) => b.y - a.y);
 	const target = targets[0];
 	const hitIndex = state.aliens.indexOf(target);
+	if (hitIndex < 0 || !target.el || !target.el.isConnected) {
+		state.energy -= 5;
+		streak = 0;
+		audio.playMiss();
+		announceGameEvent('other', 'Miss!');
+
+		cannonBtn.classList.add('misfire');
+		setTimeout(() => cannonBtn.classList.remove('misfire'), 200);
+
+		if (state.energy <= 0) gameOver();
+
+		updateStats();
+		updateEnergyAlert();
+		return;
+	}
 
 	if (state.round >= 5) {
 		streak += 1;
@@ -1280,18 +1358,7 @@ function fireCannon() {
 			state.energy = 175;
 		}
 
-		runnerActive = false;
-		runnerRef = null;
-		stopRunnerPresence();
-		if (runnerRumbleGain) {
-			runnerRumbleGain.gain.setValueAtTime(0, audio.ctx.currentTime);
-		}
-
-		if (runnerRumbleOsc) {
-			runnerRumbleOsc.stop();
-			runnerRumbleOsc = null;
-			runnerRumbleGain = null;
-		}
+		clearRunnerState();
 
 
 			const panVal = ((target.x / GAME_WIDTH) * 2) - 1;
@@ -1336,6 +1403,8 @@ function fireCannon() {
 
 document.getElementById('start-btn').addEventListener('click', () => {
 	audio.init();
+	clearRunnerState();
+	teardownEnergyAlertAudio();
 	initEnergyAlertAudio();
 	initRunnerAudio();
 
@@ -1527,7 +1596,14 @@ function loadHighScoresFromServer() {
 			'Accept': 'application/json'
 		}
 	})
-		.then((response) => response.json())
+		.then((response) => {
+			if (!response.ok) {
+				throw new Error(`High score GET failed: ${response.status}`);
+			}
+			return response.json().catch(() => {
+				throw new Error('High score GET returned invalid JSON');
+			});
+		})
 		.then((data) => {
 			if (!Array.isArray(data)) {
 				latestHighScores = [];
@@ -1656,6 +1732,13 @@ if (hsForm) {
 			token: HS_TOKEN
 		};
 
+		if (!HIGH_SCORES_URL) {
+			announce('Unable to save high score at this time.');
+			highScoreLocked = false;
+			exitHighScorePrompt();
+			return;
+		}
+
 		fetch(HIGH_SCORES_URL, {
 			method: 'POST',
 			headers: {
@@ -1664,11 +1747,20 @@ if (hsForm) {
 				'X-API-TOKEN': HS_TOKEN
 			},
 			body: JSON.stringify(payload)
-		}).then((response) => response.json()).then((data) => {
+		}).then((response) => {
+			if (!response.ok) {
+				throw new Error(`High score POST failed: ${response.status}`);
+			}
+			return response.json().catch(() => {
+				throw new Error('High score POST returned invalid JSON');
+			});
+		}).then((data) => {
 				if (Array.isArray(data)) {
 					latestHighScores = data.slice().sort((a, b) => b.score - a.score);
 					renderHighScores(latestHighScores);
 					announce('High score saved.');
+				} else {
+					throw new Error('High score POST response was not an array');
 				}
 			})
 			.catch(() => {
